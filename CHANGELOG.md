@@ -27,3 +27,9 @@
 
 **修改**
 - 合併輸出命名規則改為 `{原檔名}_merge.{副檔名}`（原為 `merged_{原檔名}`）
+- `start.bat` 改名為 `media_cut-merge.bat`，並升級前置檢查邏輯（自動安裝 Python / ffmpeg via winget）
+- bat 全面英文化（解決 CP950 編碼地雷）
+- 修正 if 區塊內 set /p 含括號導致「: was unexpected at this time.」的 bug
+
+**新增**
+- `PITFALLS.md` 補充：bat 中文字編碼地雷、if 區塊括號地雷
