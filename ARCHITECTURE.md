@@ -8,16 +8,19 @@ CLI 互動工具，讓使用者透過選單選擇音訊/影像的分割或合併
 ## 檔案清單
 
 ```
-start.bat   → 啟動入口：環境檢查（Python、ffmpeg）→ 執行 main.py
-main.py     → 主程式：互動選單、分割邏輯、合併邏輯
+media_cut-merge.bat  → 薄 BAT 入口：單行呼叫 launcher.ps1（處理 ExecutionPolicy）
+launcher.ps1         → 啟動邏輯：環境檢查（Python、ffmpeg）、自動 winget 安裝 → 執行 main.py
+main.py              → 主程式：互動選單、分割邏輯、合併邏輯
 ```
 
 ## 執行流程
 
 ```
-使用者雙擊 start.bat
-  → 檢查 Python、ffmpeg 是否存在
-  → 執行 main.py
+使用者雙擊 media_cut-merge.bat
+  → 以 -ExecutionPolicy Bypass 呼叫 launcher.ps1
+      → 檢查 Python 是否存在（沒有則提示用 winget 安裝）
+      → 檢查 ffmpeg 是否存在（沒有則提示用 winget 安裝）
+      → 執行 main.py
       → 選擇類型（音訊 / 影像）
       → 選擇操作（分割 / 合併）
       ↓
