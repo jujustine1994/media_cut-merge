@@ -404,39 +404,43 @@ class ToolApp:
         ).start()
 
     def _convert_worker(self, files, fmt):
-        success_count = 0
-        first_success_dir = ""
-        total = len(files)
-        self._set_progress(0, total, f"0 / {total}")
-        for idx, input_path in enumerate(files, start=1):
-            try:
-                base_name = os.path.splitext(os.path.basename(input_path))[0]
-                out_path = os.path.join(os.path.dirname(input_path),
-                                        base_name + CONVERT_EXT[fmt])
-                self._log(f"[INFO] {os.path.basename(input_path)} → {os.path.basename(out_path)}")
+        try:
+            success_count = 0
+            first_success_dir = ""
+            total = len(files)
+            self._set_progress(0, total, f"0 / {total}")
+            for idx, input_path in enumerate(files, start=1):
+                try:
+                    base_name = os.path.splitext(os.path.basename(input_path))[0]
+                    out_path = os.path.join(os.path.dirname(input_path),
+                                            base_name + CONVERT_EXT[fmt])
+                    self._log(f"[INFO] {os.path.basename(input_path)} → {os.path.basename(out_path)}")
 
-                cmd = build_convert_cmd(input_path, out_path, fmt)
-                result = subprocess.run(cmd, capture_output=True, text=True,
-                                        encoding='utf-8', errors='replace')
+                    cmd = build_convert_cmd(input_path, out_path, fmt)
+                    result = subprocess.run(cmd, capture_output=True, text=True,
+                                            encoding='utf-8', errors='replace')
 
-                if result.returncode != 0:
-                    err = (result.stderr.strip().splitlines()[-1]
-                           if result.stderr.strip() else "未知錯誤")
-                    self._log(f"[ERROR] 轉檔失敗：{err}")
-                else:
-                    self._log(f"[OK] {os.path.basename(out_path)}")
-                    success_count += 1
-                    if not first_success_dir:
-                        first_success_dir = os.path.dirname(input_path)
-            except Exception as e:
-                self._log(f"[ERROR] {e}")
-            self._set_progress(idx, total, f"{idx} / {total}")
+                    if result.returncode != 0:
+                        err = (result.stderr.strip().splitlines()[-1]
+                               if result.stderr.strip() else "未知錯誤")
+                        self._log(f"[ERROR] 轉檔失敗：{err}")
+                    else:
+                        self._log(f"[OK] {os.path.basename(out_path)}")
+                        success_count += 1
+                        if not first_success_dir:
+                            first_success_dir = os.path.dirname(input_path)
+                except Exception as e:
+                    self._log(f"[ERROR] {e}")
+                self._set_progress(idx, total, f"{idx} / {total}")
 
-        if success_count > 0:
-            self._log(f"\n[OK] 完成！（{success_count}/{total} 成功）")
-        else:
-            self._log(f"\n[WARNING] 全部失敗（0/{total}）")
-        self._done(first_success_dir, success_count > 0)
+            if success_count > 0:
+                self._log(f"\n[OK] 完成！（{success_count}/{total} 成功）")
+            else:
+                self._log(f"\n[WARNING] 全部失敗（0/{total}）")
+            self._done(first_success_dir, success_count > 0)
+        except Exception as e:
+            self._log(f"\n[ERROR] 未預期錯誤：{e}")
+            self._done("", False)
 
     def _build_progress_area(self, pad):
         frame = ttk.LabelFrame(self.root, text=" 處理進度 ", padding=8)
