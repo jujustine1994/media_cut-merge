@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## 2026-04-16
+
+### 新增
+- tkinter 完整 GUI 介面（三 Tab：分割 / 合併 / 轉檔）
+- 轉檔功能：影像（MP4/MKV/AVI/MOV/WMV/FLV）→ 音訊（MP3/AAC/WAV/FLAC）
+- 單元測試：`tests/test_helpers.py`（16 個測試）+ `tests/test_smoke.py`（2 個測試）
+
+### 修改
+- 分割 / 合併：操作介面從 CLI 問答改為 GUI（tkinter Notebook Tab）
+- 分割 / 合併：選檔格式合併為「音訊 + 影像」（不需預先選類型）
+- 進度條：分割用 determinate（段數）；合併 / 轉檔用 indeterminate
+- 分割：新增重複時間點防呆
+- subprocess：加 `errors='replace'` 防 Windows 中文 stderr 亂碼
+
+### 移除
+- CLI 互動流程（`input()` 問答選單）
+
+---
+
 ## 現狀總覽
 
 **目前狀態：** 穩定，可正常使用
