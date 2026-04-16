@@ -123,7 +123,130 @@ class ToolApp:
         self.root.columnconfigure(0, weight=1)
 
     def _build_split_tab(self, parent):
-        pass  # Task 3
+        # 來源檔案
+        frame_file = ttk.LabelFrame(parent, text=" 來源檔案 ", padding=8)
+        frame_file.pack(fill="x", pady=(0, 8))
+        frame_file.columnconfigure(0, weight=1)
+
+        self.split_path_var = tk.StringVar()
+        ttk.Entry(frame_file, textvariable=self.split_path_var,
+                  state="readonly", width=44).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        ttk.Button(frame_file, text="選擇", command=self._split_pick_file,
+                   width=6).grid(row=0, column=1)
+
+        # 分割時間點
+        frame_time = ttk.LabelFrame(parent, text=" 分割時間點 ", padding=8)
+        frame_time.pack(fill="x", pady=(0, 8))
+
+        row_input = tk.Frame(frame_time)
+        row_input.pack(fill="x")
+
+        SPLIT_PH = "00:00:00"
+        self._split_time_ph = SPLIT_PH
+        self.split_time_var = tk.StringVar(value=SPLIT_PH)
+        self._split_time_entry = ttk.Entry(
+            row_input, textvariable=self.split_time_var, width=12, foreground="grey"
+        )
+        self._split_time_entry.pack(side="left")
+        self._split_time_entry.bind(
+            "<FocusIn>",
+            lambda e: self._ph_focus_in(self._split_time_entry, self.split_time_var, SPLIT_PH)
+        )
+        self._split_time_entry.bind(
+            "<FocusOut>",
+            lambda e: self._ph_focus_out(self._split_time_entry, self.split_time_var, SPLIT_PH)
+        )
+        self._split_time_entry.bind("<Return>", lambda e: self._split_add_time())
+
+        ttk.Button(row_input, text="新增", command=self._split_add_time,
+                   width=6).pack(side="left", padx=(6, 0))
+        ttk.Button(row_input, text="刪除選取", command=self._split_delete_time,
+                   width=8).pack(side="left", padx=(6, 0))
+
+        self.split_listbox = tk.Listbox(frame_time, height=4, font=("Consolas", 9))
+        self.split_listbox.pack(fill="x", pady=(6, 0))
+
+        # 開始按鈕
+        self.btn_split_start = ttk.Button(
+            parent, text="▶  開始分割", command=self._split_start, width=20
+        )
+        self.btn_split_start.pack(anchor="e", pady=(4, 0))
+
+    def _split_pick_file(self):
+        path = filedialog.askopenfilename(
+            title="選擇要分割的檔案", filetypes=AUDIO_VIDEO_FILETYPES
+        )
+        if path:
+            self.split_path_var.set(path)
+
+    def _split_add_time(self):
+        t = self._get_ph_value(self.split_time_var, self._split_time_ph)
+        if not t:
+            messagebox.showerror("格式錯誤", "請輸入時間點")
+            return
+        if not validate_time(t):
+            messagebox.showerror("格式錯誤", "格式須為 HH:MM:SS（例：00:01:30）")
+            return
+        self.split_listbox.insert("end", t)
+        self.split_time_var.set(self._split_time_ph)
+        self._split_time_entry.configure(foreground="grey")
+
+    def _split_delete_time(self):
+        sel = self.split_listbox.curselection()
+        if sel:
+            self.split_listbox.delete(sel[0])
+
+    def _split_start(self):
+        path = self.split_path_var.get().strip()
+        if not path:
+            messagebox.showerror("錯誤", "請先選擇來源檔案")
+            return
+        times = list(self.split_listbox.get(0, "end"))
+        if not times:
+            messagebox.showerror("錯誤", "請至少新增一個時間點")
+            return
+        self._reset_for_run(self.btn_split_start)
+        threading.Thread(
+            target=self._split_worker, args=(path, times), daemon=True
+        ).start()
+
+    def _split_worker(self, input_path, time_points):
+        try:
+            time_points = sorted(time_points, key=time_to_seconds)
+            base_dir = os.path.dirname(input_path)
+            base_name = os.path.splitext(os.path.basename(input_path))[0]
+            ext = os.path.splitext(input_path)[1]
+
+            segments = []
+            prev = "00:00:00"
+            for i, t in enumerate(time_points):
+                segments.append((prev, t, i + 1))
+                prev = t
+            segments.append((prev, None, len(time_points) + 1))
+
+            self._set_progress(0, len(segments), f"0 / {len(segments)} 段")
+            success_count = 0
+            for start, end, idx in segments:
+                out_path = os.path.join(base_dir, f"{base_name}_part{idx}{ext}")
+                cmd = build_split_cmd(input_path, start, end, out_path)
+                result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8')
+                if result.returncode != 0:
+                    err = (result.stderr.strip().splitlines()[-1]
+                           if result.stderr.strip() else "未知錯誤")
+                    self._log(f"[ERROR] 第 {idx} 段失敗：{err}")
+                else:
+                    self._log(f"[OK] 第 {idx} 段：{os.path.basename(out_path)}")
+                    success_count += 1
+                self._set_progress(idx, len(segments), f"{idx} / {len(segments)} 段")
+
+            if success_count == len(segments):
+                self._log(f"\n[OK] 分割完成！共 {len(segments)} 個檔案")
+            else:
+                self._log(f"\n[WARNING] 完成（{success_count}/{len(segments)} 成功）")
+            self._done(base_dir, success_count == len(segments))
+        except Exception as e:
+            self._log(f"\n[ERROR] {e}")
+            self._done("", False)
 
     def _build_merge_tab(self, parent):
         pass  # Task 4
