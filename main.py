@@ -357,7 +357,76 @@ class ToolApp:
             self._done(base_dir, True)
 
     def _build_convert_tab(self, parent):
-        pass  # Task 5
+        # 來源影片
+        frame_file = ttk.LabelFrame(parent, text=" 來源影片 ", padding=8)
+        frame_file.pack(fill="x", pady=(0, 8))
+        frame_file.columnconfigure(0, weight=1)
+
+        self.convert_path_var = tk.StringVar()
+        ttk.Entry(frame_file, textvariable=self.convert_path_var,
+                  state="readonly", width=44).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        ttk.Button(frame_file, text="選擇", command=self._convert_pick_file,
+                   width=6).grid(row=0, column=1)
+
+        # 輸出格式
+        frame_fmt = ttk.LabelFrame(parent, text=" 輸出格式 ", padding=8)
+        frame_fmt.pack(fill="x", pady=(0, 8))
+
+        self.convert_fmt_var = tk.StringVar(value="MP3")
+        for fmt in ["MP3", "AAC", "WAV", "FLAC"]:
+            ttk.Radiobutton(
+                frame_fmt, text=fmt, variable=self.convert_fmt_var, value=fmt
+            ).pack(side="left", padx=10)
+
+        # 開始按鈕
+        self.btn_convert_start = ttk.Button(
+            parent, text="▶  開始轉檔", command=self._convert_start, width=20
+        )
+        self.btn_convert_start.pack(anchor="e", pady=(4, 0))
+
+    def _convert_pick_file(self):
+        path = filedialog.askopenfilename(
+            title="選擇要轉檔的影片", filetypes=VIDEO_FILETYPES
+        )
+        if path:
+            self.convert_path_var.set(path)
+
+    def _convert_start(self):
+        path = self.convert_path_var.get().strip()
+        if not path:
+            messagebox.showerror("錯誤", "請先選擇來源影片")
+            return
+        self._reset_for_run(self.btn_convert_start)
+        threading.Thread(
+            target=self._convert_worker,
+            args=(path, self.convert_fmt_var.get()),
+            daemon=True
+        ).start()
+
+    def _convert_worker(self, input_path, fmt):
+        try:
+            base_dir = os.path.dirname(input_path)
+            base_name = os.path.splitext(os.path.basename(input_path))[0]
+            out_path = os.path.join(base_dir, base_name + CONVERT_EXT[fmt])
+
+            self._start_indeterminate(f"轉檔中（→ {fmt}）...")
+            self._log(f"[INFO] {os.path.basename(input_path)} → {os.path.basename(out_path)}")
+
+            cmd = build_convert_cmd(input_path, out_path, fmt)
+            result = subprocess.run(cmd, capture_output=True, text=True,
+                                    encoding='utf-8', errors='replace')
+
+            if result.returncode != 0:
+                err = (result.stderr.strip().splitlines()[-1]
+                       if result.stderr.strip() else "未知錯誤")
+                self._log(f"[ERROR] 轉檔失敗：{err}")
+                self._done("", False)
+            else:
+                self._log(f"[OK] 轉檔完成：{os.path.basename(out_path)}")
+                self._done(base_dir, True)
+        except Exception as e:
+            self._log(f"\n[ERROR] {e}")
+            self._done("", False)
 
     def _build_progress_area(self, pad):
         frame = ttk.LabelFrame(self.root, text=" 處理進度 ", padding=8)
