@@ -252,7 +252,109 @@ class ToolApp:
             self._done("", False)
 
     def _build_merge_tab(self, parent):
-        pass  # Task 4
+        frame_files = ttk.LabelFrame(parent, text=" 來源檔案（依序排列）", padding=8)
+        frame_files.pack(fill="x", pady=(0, 8))
+
+        self._merge_files = []  # 儲存完整路徑
+        self.merge_listbox = tk.Listbox(frame_files, height=6, font=("Consolas", 9))
+        self.merge_listbox.pack(fill="x", pady=(0, 6))
+
+        row_btn = tk.Frame(frame_files)
+        row_btn.pack(fill="x")
+        ttk.Button(row_btn, text="+ 新增", command=self._merge_add_file,
+                   width=8).pack(side="left")
+        ttk.Button(row_btn, text="✕ 移除", command=self._merge_remove_file,
+                   width=8).pack(side="left", padx=4)
+        ttk.Button(row_btn, text="↑ 上移", command=self._merge_move_up,
+                   width=8).pack(side="left")
+        ttk.Button(row_btn, text="↓ 下移", command=self._merge_move_down,
+                   width=8).pack(side="left", padx=4)
+
+        self.btn_merge_start = ttk.Button(
+            parent, text="▶  開始合併", command=self._merge_start, width=20
+        )
+        self.btn_merge_start.pack(anchor="e", pady=(4, 0))
+
+    def _merge_add_file(self):
+        path = filedialog.askopenfilename(
+            title="選擇要合併的檔案", filetypes=AUDIO_VIDEO_FILETYPES
+        )
+        if path:
+            self._merge_files.append(path)
+            self._merge_refresh_listbox()
+
+    def _merge_remove_file(self):
+        sel = self.merge_listbox.curselection()
+        if sel:
+            self._merge_files.pop(sel[0])
+            self._merge_refresh_listbox()
+
+    def _merge_move_up(self):
+        sel = self.merge_listbox.curselection()
+        if sel and sel[0] > 0:
+            idx = sel[0]
+            self._merge_files[idx - 1], self._merge_files[idx] = (
+                self._merge_files[idx], self._merge_files[idx - 1]
+            )
+            self._merge_refresh_listbox()
+            self.merge_listbox.selection_set(idx - 1)
+
+    def _merge_move_down(self):
+        sel = self.merge_listbox.curselection()
+        if sel and sel[0] < len(self._merge_files) - 1:
+            idx = sel[0]
+            self._merge_files[idx], self._merge_files[idx + 1] = (
+                self._merge_files[idx + 1], self._merge_files[idx]
+            )
+            self._merge_refresh_listbox()
+            self.merge_listbox.selection_set(idx + 1)
+
+    def _merge_refresh_listbox(self):
+        self.merge_listbox.delete(0, "end")
+        for i, fp in enumerate(self._merge_files, 1):
+            self.merge_listbox.insert("end", f"{i}. {os.path.basename(fp)}")
+
+    def _merge_start(self):
+        if len(self._merge_files) < 2:
+            messagebox.showerror("錯誤", "請至少選擇 2 個檔案")
+            return
+        self._reset_for_run(self.btn_merge_start)
+        threading.Thread(
+            target=self._merge_worker, args=(list(self._merge_files),), daemon=True
+        ).start()
+
+    def _merge_worker(self, files):
+        base_dir = os.path.dirname(files[0])
+        base_name = os.path.splitext(os.path.basename(files[0]))[0]
+        ext = os.path.splitext(files[0])[1]
+        out_path = os.path.join(base_dir, f"{base_name}_merge{ext}")
+        list_path = os.path.join(base_dir, "_merge_list_tmp.txt")
+        try:
+            build_merge_list(files, list_path)
+            self._start_indeterminate("合併中...")
+            self._log(f"[INFO] 合併 {len(files)} 個檔案...")
+
+            cmd = ['ffmpeg', '-y', '-f', 'concat', '-safe', '0',
+                   '-i', list_path, '-c', 'copy', out_path]
+            result = subprocess.run(cmd, capture_output=True, text=True,
+                                    encoding='utf-8', errors='replace')
+
+            if os.path.exists(list_path):
+                os.remove(list_path)
+
+            if result.returncode != 0:
+                err = (result.stderr.strip().splitlines()[-1]
+                       if result.stderr.strip() else "未知錯誤")
+                self._log(f"[ERROR] 合併失敗：{err}")
+                self._done("", False)
+            else:
+                self._log(f"[OK] 合併完成：{os.path.basename(out_path)}")
+                self._done(base_dir, True)
+        except Exception as e:
+            if os.path.exists(list_path):
+                os.remove(list_path)
+            self._log(f"\n[ERROR] {e}")
+            self._done("", False)
 
     def _build_convert_tab(self, parent):
         pass  # Task 5
