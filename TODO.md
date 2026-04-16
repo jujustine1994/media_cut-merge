@@ -2,6 +2,7 @@
 
 ## 待辦事項
 
+- [ ] `git push`（本地 main 領先 origin 15 commits，尚未推）
 - [ ] 測試各種音影片格式（mp3, wav, mp4, mkv）
 - [ ] 測試含空格的檔案路徑
 
