@@ -187,6 +187,9 @@ class ToolApp:
         if not validate_time(t):
             messagebox.showerror("格式錯誤", "格式須為 HH:MM:SS（例：00:01:30）")
             return
+        if t in self.split_listbox.get(0, "end"):
+            messagebox.showerror("重複", f"{t} 已存在清單中")
+            return
         self.split_listbox.insert("end", t)
         self.split_time_var.set(self._split_time_ph)
         self._split_time_entry.configure(foreground="grey")
@@ -229,7 +232,7 @@ class ToolApp:
             for start, end, idx in segments:
                 out_path = os.path.join(base_dir, f"{base_name}_part{idx}{ext}")
                 cmd = build_split_cmd(input_path, start, end, out_path)
-                result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8')
+                result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
                 if result.returncode != 0:
                     err = (result.stderr.strip().splitlines()[-1]
                            if result.stderr.strip() else "未知錯誤")
