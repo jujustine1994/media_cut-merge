@@ -249,6 +249,7 @@ class ToolApp:
                         self._last_output_dir = output_dir
                         self.progress_bar["maximum"] = 1
                         self.progress_bar["value"] = 1
+                        self.progress_label.config(text="完成！")
                         self.btn_open_folder.pack(side="left")
                     else:
                         self.progress_label.config(text="發生錯誤，請查看上方記錄")
