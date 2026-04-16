@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 2026-04-17
+
+### 新增
+- 轉檔 Tab 批量轉檔：一次選取多個影片，套用同一格式批量轉，失敗不中止，逐檔回報
+
+### 修改
+- 轉檔來源選擇：`readonly Entry`（單選）→ `ttk.Label` + `askopenfilenames`（多選）
+- 轉檔進度條：indeterminate → determinate（N / total 顯示）
+
+---
+
 ## 2026-04-16
 
 ### 新增

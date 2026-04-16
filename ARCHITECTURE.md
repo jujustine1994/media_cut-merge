@@ -28,7 +28,7 @@ tests/
       → tk.Tk() 主視窗
           ├─ [分割 Tab] 選檔 + 輸入時間點 → ffmpeg -ss -t -c copy（多段）
           ├─ [合併 Tab] 選多檔排序 → ffmpeg concat -c copy
-          └─ [轉檔 Tab] 選影片 + 選格式 → ffmpeg -vn -acodec ...
+          └─ [轉檔 Tab] 多選影片 + 選格式 → ffmpeg -vn -acodec ...（批量，失敗不中止）
       → 底部共用進度區（queue 安全更新）
 ```
 
@@ -55,7 +55,7 @@ tests/
 | 合併指令 | `ffmpeg concat` + `_merge_list_tmp.txt` | 最穩定的多檔合併方式 |
 | 路徑格式 | concat 清單使用正斜線 | 避免 Windows 反斜線被 ffmpeg 誤解 |
 | 編碼（分割/合併）| `-c copy` | 串流複製，不重新編碼，速度快 |
-| 轉檔進度條 | indeterminate | ffmpeg 無法從 stdout 取得進度百分比 |
+| 轉檔進度條 | determinate（批量） | 以檔案數計算進度（N/total） |
 | `_active_start_btn` | 追蹤當前執行中的按鈕 | 統一 _done 處理，不需 per-tab 判斷 |
 | subprocess encoding | `errors='replace'` | 防止 Windows 中文路徑 stderr UnicodeDecodeError |
 
