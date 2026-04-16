@@ -329,6 +329,7 @@ class ToolApp:
         ext = os.path.splitext(files[0])[1]
         out_path = os.path.join(base_dir, f"{base_name}_merge{ext}")
         list_path = os.path.join(base_dir, "_merge_list_tmp.txt")
+        result = None
         try:
             build_merge_list(files, list_path)
             self._start_indeterminate("合併中...")
@@ -338,23 +339,22 @@ class ToolApp:
                    '-i', list_path, '-c', 'copy', out_path]
             result = subprocess.run(cmd, capture_output=True, text=True,
                                     encoding='utf-8', errors='replace')
-
-            if os.path.exists(list_path):
-                os.remove(list_path)
-
-            if result.returncode != 0:
-                err = (result.stderr.strip().splitlines()[-1]
-                       if result.stderr.strip() else "未知錯誤")
-                self._log(f"[ERROR] 合併失敗：{err}")
-                self._done("", False)
-            else:
-                self._log(f"[OK] 合併完成：{os.path.basename(out_path)}")
-                self._done(base_dir, True)
         except Exception as e:
+            self._log(f"\n[ERROR] {e}")
+        finally:
             if os.path.exists(list_path):
                 os.remove(list_path)
-            self._log(f"\n[ERROR] {e}")
+
+        if result is None:
             self._done("", False)
+        elif result.returncode != 0:
+            err = (result.stderr.strip().splitlines()[-1]
+                   if result.stderr.strip() else "未知錯誤")
+            self._log(f"[ERROR] 合併失敗：{err}")
+            self._done("", False)
+        else:
+            self._log(f"[OK] 合併完成：{os.path.basename(out_path)}")
+            self._done(base_dir, True)
 
     def _build_convert_tab(self, parent):
         pass  # Task 5
