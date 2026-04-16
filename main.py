@@ -3,17 +3,68 @@
 使用 ffmpeg 處理音訊/影像的分割與合併操作
 """
 
+# ---- 常數 ----
+
+AUDIO_VIDEO_FILETYPES = [
+    ('音訊/影像', '*.mp3 *.wav *.aac *.flac *.m4a *.ogg *.mp4 *.mkv *.avi *.mov *.wmv *.flv'),
+    ('所有檔案', '*.*')
+]
+VIDEO_FILETYPES = [
+    ('影像', '*.mp4 *.mkv *.avi *.mov *.wmv *.flv'),
+    ('所有檔案', '*.*')
+]
+CONVERT_CODECS = {
+    'MP3':  ['-vn', '-acodec', 'libmp3lame', '-q:a', '2'],
+    'AAC':  ['-vn', '-acodec', 'aac', '-b:a', '192k'],
+    'WAV':  ['-vn', '-acodec', 'pcm_s16le'],
+    'FLAC': ['-vn', '-acodec', 'flac'],
+}
+CONVERT_EXT = {'MP3': '.mp3', 'AAC': '.aac', 'WAV': '.wav', 'FLAC': '.flac'}
+
+
+# ---- 純函式（可單元測試）----
+
+def validate_time(t):
+    parts = t.strip().split(':')
+    if len(parts) != 3:
+        return False
+    try:
+        h, m, s = int(parts[0]), int(parts[1]), int(parts[2])
+        return h >= 0 and 0 <= m < 60 and 0 <= s < 60
+    except ValueError:
+        return False
+
+
+def time_to_seconds(t):
+    h, m, s = t.strip().split(':')
+    return int(h) * 3600 + int(m) * 60 + int(s)
+
+
+def build_split_cmd(input_path, start, end, out_path):
+    cmd = ['ffmpeg', '-y', '-ss', start, '-i', input_path]
+    if end:
+        duration = time_to_seconds(end) - time_to_seconds(start)
+        cmd += ['-t', str(duration)]
+    cmd += ['-c', 'copy', out_path]
+    return cmd
+
+
+def build_merge_list(files, list_path):
+    with open(list_path, 'w', encoding='utf-8') as f:
+        for fp in files:
+            safe_path = fp.replace('\\', '/')
+            f.write(f"file '{safe_path}'\n")
+
+
+def build_convert_cmd(input_path, out_path, fmt):
+    return ['ffmpeg', '-y', '-i', input_path] + CONVERT_CODECS[fmt] + [out_path]
+
+
 import subprocess
 import sys
 import os
 import tkinter as tk
 from tkinter import filedialog
-
-
-# ---- 常數 ----
-
-AUDIO_FILETYPES = [('音訊檔案', '*.mp3 *.wav *.aac *.flac *.m4a *.ogg'), ('所有檔案', '*.*')]
-VIDEO_FILETYPES = [('影像檔案', '*.mp4 *.mkv *.avi *.mov *.wmv *.flv'), ('所有檔案', '*.*')]
 
 
 # ---- 工具函式 ----
@@ -52,27 +103,6 @@ def pick_file(file_type, title='選擇檔案'):
     path = filedialog.askopenfilename(title=title, filetypes=filetypes)
     root.destroy()
     return path
-
-
-def validate_time(t):
-    """
-    驗證時間格式是否為 HH:MM:SS
-    分鐘與秒數需在 0-59 之間
-    """
-    parts = t.strip().split(':')
-    if len(parts) != 3:
-        return False
-    try:
-        h, m, s = int(parts[0]), int(parts[1]), int(parts[2])
-        return h >= 0 and 0 <= m < 60 and 0 <= s < 60
-    except ValueError:
-        return False
-
-
-def time_to_seconds(t):
-    """HH:MM:SS 轉換為秒數，用於排序比較"""
-    h, m, s = t.strip().split(':')
-    return int(h) * 3600 + int(m) * 60 + int(s)
 
 
 # ---- 分割功能 ----
