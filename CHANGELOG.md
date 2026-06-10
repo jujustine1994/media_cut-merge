@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-06-10
+
+### 修正
+- `winget install Python` 加入 `--override "/quiet PrependPath=1 Include_pip=1"`，確保靜默安裝後 Python 自動加進 PATH
+
+---
+
 ## 2026-04-17
 
 ### 新增
