@@ -4,6 +4,7 @@
 
 ### 修正
 - `winget install Python` 加入 `--override "/quiet PrependPath=1 Include_pip=1"`，確保靜默安裝後 Python 自動加進 PATH
+- `launcher.ps1` 加入全域 `trap`，攔截未處理例外，防止執行失敗時視窗直接閃退
 
 ---
 
