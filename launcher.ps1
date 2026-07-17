@@ -5,8 +5,31 @@ $host.UI.RawUI.WindowTitle = "Audio/Video Split-Merge Tool"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
 
+# ======================================
+# 執行紀錄（必加，須放在 trap 之前，閃退才記得到）
+# 完整規則見 windows-tool.md「執行紀錄」；範本說明見 windows-tool-templates.md「執行紀錄範本」
+# ======================================
+$LogFile = Join-Path $ScriptDir "logs\app.log"
+New-Item -ItemType Directory -Force (Split-Path $LogFile) | Out-Null
+$Utf8NoBom = [System.Text.UTF8Encoding]::new($false)   # 不可用 Add-Content -Encoding UTF8，會寫 BOM（地雷十一）
+
+function Write-Log {
+    param([string]$Msg, [string]$Level = "INFO")
+    $line = "[{0}] [{1,-5}] {2}`r`n" -f (Get-Date -Format "HH:mm:ss"), $Level, $Msg
+    try { [System.IO.File]::AppendAllText($LogFile, $line, $Utf8NoBom) } catch {}   # 不持有 handle（地雷十）
+}
+
+function Write-LogHeader {
+    param([string]$Msg)
+    $line = "=== {0} {1} ===`r`n" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Msg
+    try { [System.IO.File]::AppendAllText($LogFile, $line, $Utf8NoBom) } catch {}
+}
+
+Write-LogHeader "啟動"
+
 # 攔截所有未預期例外，防止視窗直接閃退
 trap {
+    Write-Log "[CRASH] $($_.Exception.Message) @ 第 $($_.InvocationInfo.ScriptLineNumber) 行" "FATAL"
     Write-Host ""
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
     Write-Host "[CRASH] 意外錯誤，程式無法繼續執行" -ForegroundColor Red
@@ -14,7 +37,7 @@ trap {
     Write-Host "  錯誤訊息：$($_.Exception.Message)" -ForegroundColor Yellow
     Write-Host "  發生位置：$($_.InvocationInfo.ScriptLineNumber) 行" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "  請截圖此畫面並回報給開發者。" -ForegroundColor White
+    Write-Host "  已記錄至 logs\app.log，請連同此畫面回報給開發者。" -ForegroundColor White
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
     Read-Host "按 Enter 關閉"
     exit 1
@@ -36,6 +59,7 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
             Write-Host "[INFO] 透過 winget 安裝 Python，請稍候..." -ForegroundColor Gray
             winget install --id Python.Python.3 -e --silent --accept-source-agreements --accept-package-agreements --override "/quiet PrependPath=1 Include_pip=1"
         } else {
+            Write-Log "找不到 winget，無法自動安裝 Python" "ERROR"
             Write-Host "[ERROR] 找不到 winget，請手動至 https://www.python.org/ 下載安裝後重新執行。" -ForegroundColor Red
             Read-Host "按 Enter 關閉"; exit 1
         }
@@ -52,6 +76,7 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     $pyVer = python --version 2>&1
     Write-Host "[OK] $pyVer 已安裝。" -ForegroundColor Green
 }
+if (-not $pyVer) { $pyVer = python --version 2>&1 }
 
 # ======================================
 # [2/2] 檢查 ffmpeg
@@ -65,6 +90,7 @@ if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
             Write-Host "[INFO] 透過 winget 安裝 ffmpeg，請稍候..." -ForegroundColor Gray
             winget install --id Gyan.FFmpeg -e --silent --accept-source-agreements --accept-package-agreements
         } else {
+            Write-Log "找不到 winget，無法自動安裝 ffmpeg" "ERROR"
             Write-Host "[ERROR] 找不到 winget，請手動至 https://ffmpeg.org/download.html 下載安裝後重新執行。" -ForegroundColor Red
             Read-Host "按 Enter 關閉"; exit 1
         }
@@ -81,6 +107,8 @@ if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
     Write-Host "[OK] ffmpeg 已安裝。" -ForegroundColor Green
 }
 
+Write-Log "環境就緒 | $pyVer"
+
 Write-Host ""
 Write-Host "[START] 啟動中，請保持此視窗開啟..." -ForegroundColor Green
 Write-Host ""
@@ -89,6 +117,7 @@ python main.py
 $exitCode = $LASTEXITCODE
 
 if ($exitCode -ne 0) {
+    Write-Log "主程式異常結束（exit code $exitCode）" "ERROR"
     Write-Host ""
     Write-Host "[ERROR] 程式意外停止，請回報上方錯誤訊息。" -ForegroundColor Red
     Read-Host "按 Enter 關閉"

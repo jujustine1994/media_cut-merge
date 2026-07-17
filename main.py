@@ -5,10 +5,57 @@
 
 import os
 import queue
+import shutil
 import subprocess
 import threading
+import time
+import uuid
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, scrolledtext
+
+
+# ---- 執行紀錄（logs/app.log，規則見 windows-tool.md「執行紀錄」）----
+
+def _find_project_root() -> str:
+    """往上找 launcher.ps1 所在目錄＝專案根目錄。
+
+    不可寫死 os.path.join(SCRIPT_DIR, "..", "logs")：主程式在根目錄的專案會算到
+    專案外層（Documents\\Code\\logs），污染其他專案。用這個函式，主程式在根目錄
+    或 src/ 都對，日後把 .py 搬進 src/ 也不會壞。
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    d = here
+    while True:
+        if os.path.exists(os.path.join(d, "launcher.ps1")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:      # 找到磁碟根目錄仍沒找到，退回自己所在目錄，至少不寫到專案外
+            return here
+        d = parent
+
+
+LOG_DIR = os.path.join(_find_project_root(), "logs")
+LOG_FILE = os.path.join(LOG_DIR, "app.log")
+
+
+def _write_log(msg: str, level: str = "INFO"):
+    """寫一行到 logs/app.log。每次開檔→寫→關檔，不持有 handle（地雷十）"""
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"[{time.strftime('%H:%M:%S')}] [{level:<5}] {msg}\n")
+    except OSError:
+        pass   # log 掛掉不能拖垮主程式；也涵蓋兩個實例同時跑撞在一起
+
+
+def _write_log_header(msg: str):
+    """任務起始行，唯一有完整日期的行"""
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"=== {time.strftime('%Y-%m-%d %H:%M:%S')} {msg} ===\n")
+    except OSError:
+        pass
 
 
 # ---- 常數 ----
@@ -66,6 +113,29 @@ def build_merge_list(files, list_path):
 
 def build_convert_cmd(input_path, out_path, fmt):
     return ['ffmpeg', '-y', '-i', input_path] + CONVERT_CODECS[fmt] + [out_path]
+
+
+def run_ffmpeg_to(cmd_builder, out_path):
+    """執行 ffmpeg 並輸出到 out_path。
+
+    ffmpeg 在 Windows 上若輸出路徑含非 ASCII 字元（如中文）會把檔名寫壞，
+    因此非 ASCII 路徑先輸出到英文暫存檔，成功後用 Python 改名（不受影響）。
+    """
+    if out_path.isascii():
+        cmd = cmd_builder(out_path)
+        return subprocess.run(cmd, capture_output=True, text=True,
+                               encoding='utf-8', errors='replace')
+    base_dir = os.path.dirname(out_path)
+    ext = os.path.splitext(out_path)[1]
+    tmp_path = os.path.join(base_dir, f"_tmp_{uuid.uuid4().hex}{ext}")
+    cmd = cmd_builder(tmp_path)
+    result = subprocess.run(cmd, capture_output=True, text=True,
+                             encoding='utf-8', errors='replace')
+    if result.returncode == 0 and os.path.exists(tmp_path):
+        os.replace(tmp_path, out_path)
+    elif os.path.exists(tmp_path):
+        os.remove(tmp_path)
+    return result
 
 
 def show_cth_banner():
@@ -214,6 +284,7 @@ class ToolApp:
         ).start()
 
     def _split_worker(self, input_path, time_points):
+        task_start = time.time()
         try:
             time_points = sorted(time_points, key=time_to_seconds)
             base_dir = os.path.dirname(input_path)
@@ -227,28 +298,38 @@ class ToolApp:
                 prev = t
             segments.append((prev, None, len(time_points) + 1))
 
+            _write_log_header(f"分割 {os.path.basename(input_path)} | {len(segments)}段")
+
             self._set_progress(0, len(segments), f"0 / {len(segments)} 段")
             success_count = 0
             for start, end, idx in segments:
                 out_path = os.path.join(base_dir, f"{base_name}_part{idx}{ext}")
-                cmd = build_split_cmd(input_path, start, end, out_path)
-                result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
+                result = run_ffmpeg_to(
+                    lambda p: build_split_cmd(input_path, start, end, p), out_path
+                )
                 if result.returncode != 0:
                     err = (result.stderr.strip().splitlines()[-1]
                            if result.stderr.strip() else "未知錯誤")
                     self._log(f"[ERROR] 第 {idx} 段失敗：{err}")
+                    self._log(f"第 {idx} 段 ffmpeg -> returncode {result.returncode}",
+                              "ERROR", to_file=True)
                 else:
                     self._log(f"[OK] 第 {idx} 段：{os.path.basename(out_path)}")
                     success_count += 1
                 self._set_progress(idx, len(segments), f"{idx} / {len(segments)} 段")
 
-            if success_count == len(segments):
+            ok = success_count == len(segments)
+            if ok:
                 self._log(f"\n[OK] 分割完成！共 {len(segments)} 個檔案")
             else:
                 self._log(f"\n[WARNING] 完成（{success_count}/{len(segments)} 成功）")
-            self._done(base_dir, success_count == len(segments))
+            elapsed = int(time.time() - task_start)
+            self._log(f"{'成功' if ok else '失敗'}，耗時 {elapsed // 60}分{elapsed % 60}秒",
+                      "OK" if ok else "FAIL", to_file=True)
+            self._done(base_dir, ok)
         except Exception as e:
             self._log(f"\n[ERROR] {e}")
+            self._log(f"{type(e).__name__}", "ERROR", to_file=True)
             self._done("", False)
 
     def _build_merge_tab(self, parent):
@@ -269,6 +350,20 @@ class ToolApp:
                    width=8).pack(side="left")
         ttk.Button(row_btn, text="↓ 下移", command=self._merge_move_down,
                    width=8).pack(side="left", padx=4)
+        ttk.Button(row_btn, text="清空列表", command=self._merge_clear_files,
+                   width=8).pack(side="left", padx=4)
+
+        frame_outname = ttk.LabelFrame(parent, text=" 輸出檔名 ", padding=8)
+        frame_outname.pack(fill="x", pady=(0, 8))
+        frame_outname.columnconfigure(0, weight=1)
+
+        self.merge_outname_var = tk.StringVar()
+        self._merge_outname_auto = True
+        self.merge_outname_entry = ttk.Entry(frame_outname, textvariable=self.merge_outname_var)
+        self.merge_outname_entry.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self.merge_outname_entry.bind("<KeyRelease>", self._merge_outname_edited)
+        self.merge_outname_ext_label = ttk.Label(frame_outname, text="")
+        self.merge_outname_ext_label.grid(row=0, column=1)
 
         self.btn_merge_start = ttk.Button(
             parent, text="▶  開始合併", command=self._merge_start, width=20
@@ -276,11 +371,11 @@ class ToolApp:
         self.btn_merge_start.pack(anchor="e", pady=(4, 0))
 
     def _merge_add_file(self):
-        path = filedialog.askopenfilename(
-            title="選擇要合併的檔案", filetypes=AUDIO_VIDEO_FILETYPES
+        paths = filedialog.askopenfilenames(
+            title="選擇要合併的檔案（可多選）", filetypes=AUDIO_VIDEO_FILETYPES
         )
-        if path:
-            self._merge_files.append(path)
+        if paths:
+            self._merge_files.extend(paths)
             self._merge_refresh_listbox()
 
     def _merge_remove_file(self):
@@ -309,52 +404,98 @@ class ToolApp:
             self._merge_refresh_listbox()
             self.merge_listbox.selection_set(idx + 1)
 
+    def _merge_clear_files(self):
+        self._merge_files.clear()
+        self._merge_outname_auto = True
+        self.merge_outname_var.set("")
+        self._merge_refresh_listbox()
+
     def _merge_refresh_listbox(self):
         self.merge_listbox.delete(0, "end")
         for i, fp in enumerate(self._merge_files, 1):
             self.merge_listbox.insert("end", f"{i}. {os.path.basename(fp)}")
+        if self._merge_files:
+            ext = os.path.splitext(self._merge_files[0])[1]
+            self.merge_outname_ext_label.config(text=ext)
+            if self._merge_outname_auto:
+                base_name = os.path.splitext(os.path.basename(self._merge_files[0]))[0]
+                self.merge_outname_var.set(f"{base_name}_merge")
+        else:
+            self.merge_outname_ext_label.config(text="")
+
+    def _merge_outname_edited(self, event):
+        self._merge_outname_auto = False
 
     def _merge_start(self):
         if len(self._merge_files) < 2:
             messagebox.showerror("錯誤", "請至少選擇 2 個檔案")
             return
+        outname = self.merge_outname_var.get().strip()
+        if not outname:
+            messagebox.showerror("錯誤", "請輸入輸出檔名")
+            return
+        if any(c in outname for c in '\\/:*?"<>|'):
+            messagebox.showerror("錯誤", '檔名不可包含 \\ / : * ? " < > |')
+            return
         self._reset_for_run(self.btn_merge_start)
         threading.Thread(
-            target=self._merge_worker, args=(list(self._merge_files),), daemon=True
+            target=self._merge_worker, args=(list(self._merge_files), outname), daemon=True
         ).start()
 
-    def _merge_worker(self, files):
+    def _merge_worker(self, files, outname):
+        task_start = time.time()
         base_dir = os.path.dirname(files[0])
-        base_name = os.path.splitext(os.path.basename(files[0]))[0]
         ext = os.path.splitext(files[0])[1]
-        out_path = os.path.join(base_dir, f"{base_name}_merge{ext}")
-        list_path = os.path.join(base_dir, "_merge_list_tmp.txt")
+        out_path = os.path.join(base_dir, f"{outname}{ext}")
+        list_path = os.path.join(base_dir, f"_merge_list_{uuid.uuid4().hex}.txt")
+        link_dir = os.path.join(base_dir, f"_merge_tmp_{uuid.uuid4().hex}")
         result = None
+        _write_log_header(f"合併 {len(files)}個檔案 -> {outname}{ext}")
         try:
-            build_merge_list(files, list_path)
+            # 來源檔名若含單引號等特殊字元會破壞 concat 清單格式解析，
+            # 先用英文暫存連結（同磁碟用 hardlink 不佔額外空間，失敗則複製）避開此問題
+            os.makedirs(link_dir, exist_ok=True)
+            safe_files = []
+            for i, fp in enumerate(files):
+                link_path = os.path.join(link_dir, f"{i}{os.path.splitext(fp)[1]}")
+                try:
+                    os.link(fp, link_path)
+                except OSError:
+                    shutil.copy2(fp, link_path)
+                safe_files.append(link_path)
+
+            build_merge_list(safe_files, list_path)
             self._start_indeterminate("合併中...")
             self._log(f"[INFO] 合併 {len(files)} 個檔案...")
 
-            cmd = ['ffmpeg', '-y', '-f', 'concat', '-safe', '0',
-                   '-i', list_path, '-c', 'copy', out_path]
-            result = subprocess.run(cmd, capture_output=True, text=True,
-                                    encoding='utf-8', errors='replace')
+            cmd_builder = lambda p: ['ffmpeg', '-y', '-f', 'concat', '-safe', '0',
+                                      '-i', list_path, '-c', 'copy', p]
+            result = run_ffmpeg_to(cmd_builder, out_path)
         except Exception as e:
             self._log(f"\n[ERROR] {e}")
+            self._log(f"{type(e).__name__}", "ERROR", to_file=True)
         finally:
             if os.path.exists(list_path):
                 os.remove(list_path)
+            if os.path.isdir(link_dir):
+                shutil.rmtree(link_dir, ignore_errors=True)
 
         if result is None:
-            self._done("", False)
+            ok = False
         elif result.returncode != 0:
             err = (result.stderr.strip().splitlines()[-1]
                    if result.stderr.strip() else "未知錯誤")
             self._log(f"[ERROR] 合併失敗：{err}")
-            self._done("", False)
+            self._log(f"合併 ffmpeg -> returncode {result.returncode}", "ERROR", to_file=True)
+            ok = False
         else:
             self._log(f"[OK] 合併完成：{os.path.basename(out_path)}")
-            self._done(base_dir, True)
+            ok = True
+
+        elapsed = int(time.time() - task_start)
+        self._log(f"{'成功' if ok else '失敗'}，耗時 {elapsed // 60}分{elapsed % 60}秒",
+                  "OK" if ok else "FAIL", to_file=True)
+        self._done(base_dir if ok else "", ok)
 
     def _build_convert_tab(self, parent):
         # 來源影片
@@ -404,6 +545,8 @@ class ToolApp:
         ).start()
 
     def _convert_worker(self, files, fmt):
+        task_start = time.time()
+        _write_log_header(f"轉檔 {len(files)}個檔案 -> {fmt}")
         try:
             success_count = 0
             first_success_dir = ""
@@ -416,14 +559,16 @@ class ToolApp:
                                             base_name + CONVERT_EXT[fmt])
                     self._log(f"[INFO] {os.path.basename(input_path)} → {os.path.basename(out_path)}")
 
-                    cmd = build_convert_cmd(input_path, out_path, fmt)
-                    result = subprocess.run(cmd, capture_output=True, text=True,
-                                            encoding='utf-8', errors='replace')
+                    result = run_ffmpeg_to(
+                        lambda p: build_convert_cmd(input_path, p, fmt), out_path
+                    )
 
                     if result.returncode != 0:
                         err = (result.stderr.strip().splitlines()[-1]
                                if result.stderr.strip() else "未知錯誤")
                         self._log(f"[ERROR] 轉檔失敗：{err}")
+                        self._log(f"第 {idx} 個檔案 ffmpeg -> returncode {result.returncode}",
+                                  "ERROR", to_file=True)
                     else:
                         self._log(f"[OK] {os.path.basename(out_path)}")
                         success_count += 1
@@ -431,15 +576,21 @@ class ToolApp:
                             first_success_dir = os.path.dirname(input_path)
                 except Exception as e:
                     self._log(f"[ERROR] {e}")
+                    self._log(f"第 {idx} 個檔案 -> {type(e).__name__}", "ERROR", to_file=True)
                 self._set_progress(idx, total, f"{idx} / {total}")
 
-            if success_count > 0:
+            ok = success_count > 0
+            if ok:
                 self._log(f"\n[OK] 完成！（{success_count}/{total} 成功）")
             else:
                 self._log(f"\n[WARNING] 全部失敗（0/{total}）")
-            self._done(first_success_dir, success_count > 0)
+            elapsed = int(time.time() - task_start)
+            self._log(f"{'成功' if ok else '失敗'}，耗時 {elapsed // 60}分{elapsed % 60}秒",
+                      "OK" if ok else "FAIL", to_file=True)
+            self._done(first_success_dir, ok)
         except Exception as e:
             self._log(f"\n[ERROR] 未預期錯誤：{e}")
+            self._log(f"{type(e).__name__}", "ERROR", to_file=True)
             self._done("", False)
 
     def _build_progress_area(self, pad):
@@ -519,7 +670,10 @@ class ToolApp:
         self.log_text.insert("end", msg)
         self.log_text.config(state="disabled")
 
-    def _log(self, msg):
+    def _log(self, msg, level="INFO", to_file=False):
+        """推 UI queue；to_file=True 時同時落檔（預設 False，漏帶旗標時是少記不是誤記）"""
+        if to_file:
+            _write_log(msg, level)
         self.msg_queue.put(("log", msg))
 
     def _set_progress(self, current, total, label):

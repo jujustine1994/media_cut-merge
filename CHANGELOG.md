@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## 2026-07-17
+
+### 新增
+- 導入執行紀錄（log）規範：`launcher.ps1` 與 `main.py` 皆落檔至 `logs/app.log`（單一檔案累積，不分割）
+- `launcher.ps1`：`Write-Log` / `Write-LogHeader`（放在 `trap` 之前，閃退也記得到），記錄啟動、環境就緒、winget 找不到、主程式異常結束、CRASH
+- `main.py`：`_find_project_root()` / `_write_log()` / `_write_log_header()`；`_log()` 加 `to_file` 參數（預設 `False`，fail-closed）
+- 分割 / 合併 / 轉檔三個 worker 皆採三段式落檔：任務起始（含檔名/段數/格式等關鍵設定）、錯誤（ffmpeg returncode 或例外 `type(e).__name__`，不寫入完整 stderr/例外內容）、任務結果（成功/失敗 + 耗時）
+- `.gitignore` 加入 `logs/`
+
+## 2026-06-21
+
+### 修復
+- 合併：來源檔名含單引號（`'`）會破壞 ffmpeg concat 清單格式，導致「Error opening input files: Invalid data found when processing input」。修法：合併前先用英文暫存連結（hardlink，失敗則複製）取代原檔名餵給 ffmpeg，完成後清除暫存
+- 輸出檔名（合併/分割/轉檔）含非 ASCII 字元時，先輸出到英文暫存檔再用 Python 改名，避免依賴 ffmpeg 對應路徑的處理結果
+
+### 新增
+- 合併分頁加「輸出檔名」欄，選檔後自動帶入 `{第一個檔名}_merge`（副檔名隨第一個來源檔），使用者可自行修改；開始前檢查空白與非法字元（`\ / : * ? " < > |`）
+
+### 修改
+- 合併來源選擇：`askopenfilename`（單選）→ `askopenfilenames`（多選），一次可選多個檔案加入合併清單
+
+---
+
 ## 2026-06-10
 
 ### 修正
