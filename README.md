@@ -14,7 +14,7 @@ A Windows CLI tool to split and merge audio/video files using ffmpeg.
 
 ## 執行方式
 
-雙擊 `start.bat` 啟動。
+雙擊 `media_cut-merge.bat` 啟動。
 
 ## 系統需求
 
@@ -26,12 +26,13 @@ A Windows CLI tool to split and merge audio/video files using ffmpeg.
 1. 安裝 Python：https://www.python.org/
 2. 安裝 ffmpeg：https://ffmpeg.org/download.html
    - 下載解壓縮後，將 `bin/` 路徑加入系統環境變數 PATH
-3. 雙擊 `start.bat` 即可使用，無需額外套件安裝
+3. 雙擊 `media_cut-merge.bat` 即可使用，無需額外套件安裝
 
 ## 功能
 
 - **音訊 / 影像分割**：選擇檔案後輸入多個 HH:MM:SS 時間點，自動切成多段
 - **音訊 / 影像合併**：依序選擇檔案，合併為單一輸出檔
+- **音訊轉檔**：選擇影像檔案，轉為 MP3 / AAC / WAV / FLAC 音訊格式
 
 ## 支援格式
 
@@ -46,3 +47,4 @@ A Windows CLI tool to split and merge audio/video files using ffmpeg.
 |------|---------|
 | 分割 | `{原檔名}_part1.{副檔名}`、`{原檔名}_part2.{副檔名}`... |
 | 合併 | `{第一個檔名}_merge.{副檔名}` |
+| 轉檔 | `{原檔名}.{副檔名}` |

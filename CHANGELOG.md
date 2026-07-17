@@ -2,6 +2,9 @@
 
 ## 2026-07-17
 
+### 文件修正
+- README.md：啟動指令 `start.bat`（舊名）改為 `media_cut-merge.bat`（實際檔名）；「功能」與「支援格式」章節補上轉檔功能說明
+
 ### 新增
 - 導入執行紀錄（log）規範：`launcher.ps1` 與 `main.py` 皆落檔至 `logs/app.log`（單一檔案累積，不分割）
 - `launcher.ps1`：`Write-Log` / `Write-LogHeader`（放在 `trap` 之前，閃退也記得到），記錄啟動、環境就緒、winget 找不到、主程式異常結束、CRASH
