@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import threading
 import time
+import traceback
 import uuid
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, scrolledtext
@@ -56,6 +57,25 @@ def _write_log_header(msg: str):
             f.write(f"=== {time.strftime('%Y-%m-%d %H:%M:%S')} {msg} ===\n")
     except OSError:
         pass
+
+
+def _com_state() -> str:
+    """回報目前執行緒的 COM apartment 狀態（診斷用）。
+
+    Tk 在 Windows 的檔案對話框是走 COM 的 IFileOpenDialog，底層失敗時 Tk 會
+    「靜默回傳空字串」——不拋例外、不寫任何訊息，而且不會自我復原，只有重啟
+    程式才會好。對話框回空時一併記下這個狀態，事後才判斷得出是不是 COM 的問題。
+    """
+    try:
+        import ctypes
+        t, q = ctypes.c_int(-1), ctypes.c_int(-1)
+        hr = ctypes.windll.ole32.CoGetApartmentType(ctypes.byref(t), ctypes.byref(q))
+        if hr != 0:
+            return f"未進入 apartment(hr=0x{hr & 0xFFFFFFFF:08X})"
+        name = {0: "STA", 1: "MTA", 2: "NA", 3: "MAINSTA"}.get(t.value, str(t.value))
+        return f"{name}/qual={q.value}"
+    except Exception:
+        return "查不到"
 
 
 # ---- 常數 ----
@@ -169,6 +189,10 @@ class ToolApp:
 
         self._build_ui()
         self._poll_queue()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        # tkinter 預設把 callback 例外印到 stderr 就算了：GUI 不會崩，使用者只看到
+        # 「按了沒反應」，log 也完全沒有紀錄。攔下來落檔，否則永遠查不到。
+        self.root.report_callback_exception = self._on_tk_exception
 
     # ---------- UI 建構 ----------
 
@@ -371,12 +395,37 @@ class ToolApp:
         self.btn_merge_start.pack(anchor="e", pady=(4, 0))
 
     def _merge_add_file(self):
-        paths = filedialog.askopenfilenames(
-            title="選擇要合併的檔案（可多選）", filetypes=AUDIO_VIDEO_FILETYPES
-        )
-        if paths:
-            self._merge_files.extend(paths)
-            self._merge_refresh_listbox()
+        # 診斷中（見 docs/PITFALLS.md「合併清單加不進檔案」）：對話框回空時原本是
+        # 靜默跳過，什麼線索都留不下，所以這裡把回傳值與 COM 狀態一併落檔。
+        try:
+            paths = filedialog.askopenfilenames(
+                title="選擇要合併的檔案（可多選）", filetypes=AUDIO_VIDEO_FILETYPES
+            )
+        except Exception as e:
+            _write_log(f"合併選檔 askopenfilenames -> {type(e).__name__} | COM {_com_state()}",
+                       "ERROR")
+            messagebox.showerror(
+                "選檔失敗",
+                f"檔案選取視窗發生錯誤（{type(e).__name__}）。\n"
+                "請關閉程式重新開啟，並把 logs\\app.log 提供給 AI 查詢。"
+            )
+            return
+
+        if not paths:
+            # 空回傳有兩種可能，Python 端無法區分：①使用者按取消（正常）
+            # ②Tk 的 COM 對話框故障（靜默回空，永久性，重啟才會好）。
+            # 一律落檔；判讀方式：使用者明明有選檔卻出現這行 = ②。
+            _write_log(
+                f"合併選檔回傳空 | type={type(paths).__name__} repr={paths!r} | "
+                f"COM {_com_state()} | 清單現有 {len(self._merge_files)} 筆",
+                "WARN"
+            )
+            self._log_raw("（未加入任何檔案。若你剛才確實有選檔案，"
+                          "這是已知問題，請重開程式並回報 logs\\app.log）\n")
+            return
+
+        self._merge_files.extend(paths)
+        self._merge_refresh_listbox()
 
     def _merge_remove_file(self):
         sel = self.merge_listbox.curselection()
@@ -475,10 +524,15 @@ class ToolApp:
             self._log(f"\n[ERROR] {e}")
             self._log(f"{type(e).__name__}", "ERROR", to_file=True)
         finally:
-            if os.path.exists(list_path):
-                os.remove(list_path)
-            if os.path.isdir(link_dir):
-                shutil.rmtree(link_dir, ignore_errors=True)
+            # 這裡若拋例外會直接殺掉整個 worker thread，下面的 _done() 就永遠不會被
+            # 呼叫 —— is_running 卡在 True、開始按鈕永久反灰、進度條一直轉。
+            # 暫存清單檔被防毒掃描鎖住時就會這樣，所以務必吞掉。
+            try:
+                if os.path.exists(list_path):
+                    os.remove(list_path)
+            except OSError as e:
+                _write_log(f"清除暫存清單 -> {type(e).__name__}", "ERROR")
+            shutil.rmtree(link_dir, ignore_errors=True)
 
         if result is None:
             ok = False
@@ -643,6 +697,20 @@ class ToolApp:
 
     # ---------- 共用 ----------
 
+    def _on_tk_exception(self, exc_type, exc_value, exc_tb):
+        """tkinter callback 內未處理的例外：落檔 + 照樣印到 console"""
+        _write_log(f"UI callback -> {exc_type.__name__}", "ERROR")
+        traceback.print_exception(exc_type, exc_value, exc_tb)
+
+    def _on_close(self):
+        """關閉視窗前若有任務執行中，跳出確認提示"""
+        if self.is_running:
+            if not messagebox.askyesno(
+                "確認關閉", "任務執行中，確定要關閉視窗嗎？關閉後任務會被中止。"
+            ):
+                return
+        self.root.destroy()
+
     def _open_output_folder(self):
         if self._last_output_dir and os.path.exists(self._last_output_dir):
             os.startfile(self._last_output_dir)
@@ -668,6 +736,7 @@ class ToolApp:
         """主執行緒直接寫入（初始化用）"""
         self.log_text.config(state="normal")
         self.log_text.insert("end", msg)
+        self.log_text.see("end")
         self.log_text.config(state="disabled")
 
     def _log(self, msg, level="INFO", to_file=False):
@@ -720,6 +789,10 @@ class ToolApp:
                         self.progress_label.config(text="發生錯誤，請查看上方記錄")
         except queue.Empty:
             pass
+        except Exception as e:
+            # 例外若逃出這個函式，下面的 root.after 就不會執行，輪詢從此永久停擺，
+            # 之後所有記錄、進度、完成狀態都不再更新（畫面看起來像整個卡死）
+            _write_log(f"UI 輪詢 -> {type(e).__name__}", "ERROR")
         self.root.after(100, self._poll_queue)
 
 
