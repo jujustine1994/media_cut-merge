@@ -41,6 +41,13 @@ A Windows CLI tool to split and merge audio/video files using ffmpeg.
 | 音訊 | MP3、WAV、AAC、FLAC、M4A、OGG |
 | 影像 | MP4、MKV、AVI、MOV、WMV、FLV |
 
+## 出問題時
+
+執行紀錄在 `logs/app.log`（單一檔案累積）。程式行為異常時，**先不要重開**，
+把這個檔案提供給 AI 判讀——重開會讓當下的狀態消失。
+
+已知問題與追查中的 bug 見 `PITFALLS.md`。
+
 ## 輸出命名規則
 
 | 操作 | 輸出格式 |
