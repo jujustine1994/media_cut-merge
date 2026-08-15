@@ -20,6 +20,25 @@
 
 ### 修復
 - `_split_worker()` 與 `_split_add_time()` 的區域變數 `t` 會遮蔽 `i18n.t`，導致同 scope 內 `t("...")` 變成對字串做呼叫而拋 `TypeError`（分割功能會整個失效）。改名為 `tp`
+- **上面那條是遷移當場炸出的真 bug，不是預防性修改**：`_split_worker()`（`main.py` 第 406 行起）的
+  `for i, t in enumerate(...)` 讓迴圈之後所有 `t(...)` 都變成「對字串做呼叫」→ `TypeError`，
+  **分割功能整條路徑會掛掉**；`_split_add_time()`（第 370 行）同樣中招。
+  另有三處潛伏但同樣危險：`_com_state()`（第 68 行）、`validate_time(t)`（第 117 行）、
+  `time_to_seconds(t)`（第 128 行），已一併改名為 `apt` / `value`——
+  這三個函式的呼叫端全部是位置參數，改參數名不影響任何行為
+- 已加 `test_nothing_shadows_the_translation_function` 永久釘住：AST 掃描，任何函式把 `t` 綁成
+  參數或區域名稱就紅燈。這類 bug 靜態看程式碼完全正常，只有那條 code path 真的跑到才炸，人眼複查擋不住
+
+### 判斷紀錄
+- **判成「資料」不翻**：輸出檔名樣板 `_part{n}` / `_merge`、暫存前綴 `_tmp_` / `_merge_list_` / `_merge_tmp_`
+  （`main.py` 第 165、430、623–624 行）、concat 清單的 `file '...'` 格式、ffmpeg 全部參數與 codec 名
+  （`CONVERT_CODECS`，第 106–111 行）、`CONVERT_EXT` 的副檔名與格式選項 `MP3`/`AAC`/`WAV`/`FLAC`
+  （第 112 行；這四個同時是 `CONVERT_CODECS` 的鍵，翻了 `CONVERT_EXT[fmt]` 當場 `KeyError`）、
+  檔案類型萬用字元樣式、Windows 檔名非法字元集合、`"00:00:00"` placeholder、log level 與 queue 訊息型別
+- **`i18n.ui_font()` 建了但不呼叫**（`i18n.py` 第 98 行）：一接字型繁中外觀就跟遷移前不一樣，
+  無法用「畫面長得一模一樣」驗證遷移沒改壞東西
+- **未動 `PITFALLS.md` 的未解 bug**（合併清單加不進檔案）：診斷儀器完整保留，一行沒碰
+- 其餘順手發現但未處理的問題（缺 `requirements.txt`、文件未收進 `docs/` 等）與待校對譯文見 `TODO.md`
 
 ### 測試（18 → 96 條，既有 18 條一條未改）
 - `tests/test_i18n.py`：key 集合一致／placeholder 一致／不得寫死中日文（豁免清單只有 `i18n.py` 與 `logtext.py`，並用反向測試釘住 `main.py` 一定在掃描範圍且範圍非空）
