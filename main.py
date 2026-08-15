@@ -18,6 +18,7 @@ from tkinter import ttk, messagebox, filedialog, scrolledtext
 import i18n
 from config import CONFIG_PATH, load_config, save_config
 from i18n import t
+from logtext import LOG_TEXT
 
 
 # ---- 執行紀錄（logs/app.log，規則見 windows-tool.md「執行紀錄」）----
@@ -76,11 +77,11 @@ def _com_state() -> str:
         t, q = ctypes.c_int(-1), ctypes.c_int(-1)
         hr = ctypes.windll.ole32.CoGetApartmentType(ctypes.byref(t), ctypes.byref(q))
         if hr != 0:
-            return f"未進入 apartment(hr=0x{hr & 0xFFFFFFFF:08X})"
+            return LOG_TEXT["com_not_entered"].format(hr=f"{hr & 0xFFFFFFFF:08X}")
         name = {0: "STA", 1: "MTA", 2: "NA", 3: "MAINSTA"}.get(t.value, str(t.value))
         return f"{name}/qual={q.value}"
     except Exception:
-        return "查不到"
+        return LOG_TEXT["com_unknown"]
 
 
 # ---- 常數 ----
@@ -406,7 +407,8 @@ class ToolApp:
                 prev = t
             segments.append((prev, None, len(time_points) + 1))
 
-            _write_log_header(f"分割 {os.path.basename(input_path)} | {len(segments)}段")
+            _write_log_header(LOG_TEXT["split_start"].format(
+                name=os.path.basename(input_path), count=len(segments)))
 
             self._set_progress(0, len(segments), f"0 / {len(segments)} 段")
             success_count = 0
@@ -420,7 +422,9 @@ class ToolApp:
                            if result.stderr.strip() else "未知錯誤")
                     self._log(f"[ERROR] 第 {idx} 段失敗：{err}")
                     self._log(f"第 {idx} 段 ffmpeg -> returncode {result.returncode}",
-                              "ERROR", to_file=True)
+                              "ERROR", to_file=True,
+                              log_msg=LOG_TEXT["split_seg_error"].format(
+                                  idx=idx, code=result.returncode))
                 else:
                     self._log(f"[OK] 第 {idx} 段：{os.path.basename(out_path)}")
                     success_count += 1
@@ -432,8 +436,11 @@ class ToolApp:
             else:
                 self._log(f"\n[WARNING] 完成（{success_count}/{len(segments)} 成功）")
             elapsed = int(time.time() - task_start)
-            self._log(f"{'成功' if ok else '失敗'}，耗時 {elapsed // 60}分{elapsed % 60}秒",
-                      "OK" if ok else "FAIL", to_file=True)
+            mins, secs = elapsed // 60, elapsed % 60
+            self._log(f"{'成功' if ok else '失敗'}，耗時 {mins}分{secs}秒",
+                      "OK" if ok else "FAIL", to_file=True,
+                      log_msg=LOG_TEXT["task_ok" if ok else "task_fail"].format(
+                          minutes=mins, seconds=secs))
             self._done(base_dir, ok)
         except Exception as e:
             self._log(f"\n[ERROR] {e}")
@@ -489,8 +496,8 @@ class ToolApp:
                 title="選擇要合併的檔案（可多選）", filetypes=AUDIO_VIDEO_FILETYPES
             )
         except Exception as e:
-            _write_log(f"合併選檔 askopenfilenames -> {type(e).__name__} | COM {_com_state()}",
-                       "ERROR")
+            _write_log(LOG_TEXT["pick_exception"].format(
+                exc=type(e).__name__, com=_com_state()), "ERROR")
             messagebox.showerror(
                 "選檔失敗",
                 f"檔案選取視窗發生錯誤（{type(e).__name__}）。\n"
@@ -505,9 +512,13 @@ class ToolApp:
             # 用 elapsed 區分：人類不可能在 0.5 秒內開視窗＋按取消。
             never_opened = elapsed < 0.5
             _write_log(
-                f"合併選檔回傳空 | type={type(paths).__name__} repr={paths!r} | "
-                f"耗時 {elapsed:.3f}s{'（視窗未開啟）' if never_opened else '（使用者取消）'} | "
-                f"COM {_com_state()} | 清單現有 {len(self._merge_files)} 筆",
+                LOG_TEXT["pick_empty"].format(
+                    type=type(paths).__name__, repr=repr(paths),
+                    elapsed=f"{elapsed:.3f}",
+                    note=LOG_TEXT["pick_never_opened" if never_opened
+                                  else "pick_cancelled"],
+                    com=_com_state(), count=len(self._merge_files),
+                ),
                 "WARN"
             )
             if never_opened:
@@ -592,7 +603,8 @@ class ToolApp:
         list_path = os.path.join(base_dir, f"_merge_list_{uuid.uuid4().hex}.txt")
         link_dir = os.path.join(base_dir, f"_merge_tmp_{uuid.uuid4().hex}")
         result = None
-        _write_log_header(f"合併 {len(files)}個檔案 -> {outname}{ext}")
+        _write_log_header(LOG_TEXT["merge_start"].format(
+            count=len(files), name=f"{outname}{ext}"))
         try:
             # 來源檔名若含單引號等特殊字元會破壞 concat 清單格式解析，
             # 先用英文暫存連結（同磁碟用 hardlink 不佔額外空間，失敗則複製）避開此問題
@@ -624,7 +636,8 @@ class ToolApp:
                 if os.path.exists(list_path):
                     os.remove(list_path)
             except OSError as e:
-                _write_log(f"清除暫存清單 -> {type(e).__name__}", "ERROR")
+                _write_log(LOG_TEXT["merge_cleanup_error"].format(
+                    exc=type(e).__name__), "ERROR")
             shutil.rmtree(link_dir, ignore_errors=True)
 
         if result is None:
@@ -633,15 +646,20 @@ class ToolApp:
             err = (result.stderr.strip().splitlines()[-1]
                    if result.stderr.strip() else "未知錯誤")
             self._log(f"[ERROR] 合併失敗：{err}")
-            self._log(f"合併 ffmpeg -> returncode {result.returncode}", "ERROR", to_file=True)
+            self._log(f"合併 ffmpeg -> returncode {result.returncode}", "ERROR",
+                      to_file=True,
+                      log_msg=LOG_TEXT["merge_error"].format(code=result.returncode))
             ok = False
         else:
             self._log(f"[OK] 合併完成：{os.path.basename(out_path)}")
             ok = True
 
         elapsed = int(time.time() - task_start)
-        self._log(f"{'成功' if ok else '失敗'}，耗時 {elapsed // 60}分{elapsed % 60}秒",
-                  "OK" if ok else "FAIL", to_file=True)
+        mins, secs = elapsed // 60, elapsed % 60
+        self._log(f"{'成功' if ok else '失敗'}，耗時 {mins}分{secs}秒",
+                  "OK" if ok else "FAIL", to_file=True,
+                  log_msg=LOG_TEXT["task_ok" if ok else "task_fail"].format(
+                      minutes=mins, seconds=secs))
         self._done(base_dir if ok else "", ok)
 
     def _build_convert_tab(self, parent):
@@ -693,7 +711,8 @@ class ToolApp:
 
     def _convert_worker(self, files, fmt):
         task_start = time.time()
-        _write_log_header(f"轉檔 {len(files)}個檔案 -> {fmt}")
+        _write_log_header(LOG_TEXT["convert_start"].format(
+            count=len(files), fmt=fmt))
         try:
             success_count = 0
             first_success_dir = ""
@@ -715,7 +734,9 @@ class ToolApp:
                                if result.stderr.strip() else "未知錯誤")
                         self._log(f"[ERROR] 轉檔失敗：{err}")
                         self._log(f"第 {idx} 個檔案 ffmpeg -> returncode {result.returncode}",
-                                  "ERROR", to_file=True)
+                                  "ERROR", to_file=True,
+                                  log_msg=LOG_TEXT["convert_error"].format(
+                                      idx=idx, code=result.returncode))
                     else:
                         self._log(f"[OK] {os.path.basename(out_path)}")
                         success_count += 1
@@ -723,7 +744,10 @@ class ToolApp:
                             first_success_dir = os.path.dirname(input_path)
                 except Exception as e:
                     self._log(f"[ERROR] {e}")
-                    self._log(f"第 {idx} 個檔案 -> {type(e).__name__}", "ERROR", to_file=True)
+                    self._log(f"第 {idx} 個檔案 -> {type(e).__name__}", "ERROR",
+                              to_file=True,
+                              log_msg=LOG_TEXT["convert_item_error"].format(
+                                  idx=idx, exc=type(e).__name__))
                 self._set_progress(idx, total, f"{idx} / {total}")
 
             ok = success_count > 0
@@ -732,8 +756,11 @@ class ToolApp:
             else:
                 self._log(f"\n[WARNING] 全部失敗（0/{total}）")
             elapsed = int(time.time() - task_start)
-            self._log(f"{'成功' if ok else '失敗'}，耗時 {elapsed // 60}分{elapsed % 60}秒",
-                      "OK" if ok else "FAIL", to_file=True)
+            mins, secs = elapsed // 60, elapsed % 60
+            self._log(f"{'成功' if ok else '失敗'}，耗時 {mins}分{secs}秒",
+                      "OK" if ok else "FAIL", to_file=True,
+                      log_msg=LOG_TEXT["task_ok" if ok else "task_fail"].format(
+                          minutes=mins, seconds=secs))
             self._done(first_success_dir, ok)
         except Exception as e:
             self._log(f"\n[ERROR] 未預期錯誤：{e}")
@@ -832,10 +859,16 @@ class ToolApp:
         self.log_text.see("end")
         self.log_text.config(state="disabled")
 
-    def _log(self, msg, level="INFO", to_file=False):
-        """推 UI queue；to_file=True 時同時落檔（預設 False，漏帶旗標時是少記不是誤記）"""
+    def _log(self, msg, level="INFO", to_file=False, log_msg=None):
+        """推 UI queue；to_file=True 時同時落檔（預設 False，漏帶旗標時是少記不是誤記）
+
+        `msg` 是給使用者看的（跟著介面語言走），`log_msg` 是落檔的那份
+        （永遠繁中，取自 logtext.LOG_TEXT）。兩者分開才能同時滿足
+        「log 固定母語言」與「一個呼叫同時寫檔＋推 UI」兩條規則；
+        沒給 log_msg 時退回用 msg，行為與原本一致。
+        """
         if to_file:
-            _write_log(msg, level)
+            _write_log(log_msg if log_msg is not None else msg, level)
         self.msg_queue.put(("log", msg))
 
     def _set_progress(self, current, total, label):
@@ -885,7 +918,7 @@ class ToolApp:
         except Exception as e:
             # 例外若逃出這個函式，下面的 root.after 就不會執行，輪詢從此永久停擺，
             # 之後所有記錄、進度、完成狀態都不再更新（畫面看起來像整個卡死）
-            _write_log(f"UI 輪詢 -> {type(e).__name__}", "ERROR")
+            _write_log(LOG_TEXT["poll_error"].format(exc=type(e).__name__), "ERROR")
         self.root.after(100, self._poll_queue)
 
 
