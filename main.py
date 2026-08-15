@@ -370,13 +370,14 @@ class ToolApp:
         # 變數不可叫 t（遮蔽 i18n.t）——見 _split_worker 的註解
         tp = self._get_ph_value(self.split_time_var, self._split_time_ph)
         if not tp:
-            messagebox.showerror("格式錯誤", "請輸入時間點")
+            messagebox.showerror(t("gui.msg.format_title"), t("gui.msg.time_required"))
             return
         if not validate_time(tp):
-            messagebox.showerror("格式錯誤", "格式須為 HH:MM:SS（例：00:01:30）")
+            messagebox.showerror(t("gui.msg.format_title"), t("gui.msg.time_format"))
             return
         if tp in self.split_listbox.get(0, "end"):
-            messagebox.showerror("重複", f"{tp} 已存在清單中")
+            messagebox.showerror(t("gui.msg.duplicate_title"),
+                                 t("gui.msg.duplicate_body", time=tp))
             return
         self.split_listbox.insert("end", tp)
         self.split_time_var.set(self._split_time_ph)
@@ -390,11 +391,11 @@ class ToolApp:
     def _split_start(self):
         path = self.split_path_var.get().strip()
         if not path:
-            messagebox.showerror("錯誤", "請先選擇來源檔案")
+            messagebox.showerror(t("gui.msg.error_title"), t("gui.msg.need_source"))
             return
         times = list(self.split_listbox.get(0, "end"))
         if not times:
-            messagebox.showerror("錯誤", "請至少新增一個時間點")
+            messagebox.showerror(t("gui.msg.error_title"), t("gui.msg.need_time"))
             return
         self._reset_for_run(self.btn_split_start)
         threading.Thread(
@@ -517,9 +518,8 @@ class ToolApp:
             _write_log(LOG_TEXT["pick_exception"].format(
                 exc=type(e).__name__, com=_com_state()), "ERROR")
             messagebox.showerror(
-                "選檔失敗",
-                f"檔案選取視窗發生錯誤（{type(e).__name__}）。\n"
-                "請關閉程式重新開啟，並把 logs\\app.log 提供給 AI 查詢。"
+                t("gui.msg.pick_fail_title"),
+                t("gui.msg.pick_fail_body", exc=type(e).__name__)
             )
             return
 
@@ -599,14 +599,15 @@ class ToolApp:
 
     def _merge_start(self):
         if len(self._merge_files) < 2:
-            messagebox.showerror("錯誤", "請至少選擇 2 個檔案")
+            messagebox.showerror(t("gui.msg.error_title"), t("gui.msg.need_two_files"))
             return
         outname = self.merge_outname_var.get().strip()
         if not outname:
-            messagebox.showerror("錯誤", "請輸入輸出檔名")
+            messagebox.showerror(t("gui.msg.error_title"), t("gui.msg.need_outname"))
             return
+        # 這串字元是**資料**（Windows 檔名的非法字元），不可翻譯
         if any(c in outname for c in '\\/:*?"<>|'):
-            messagebox.showerror("錯誤", '檔名不可包含 \\ / : * ? " < > |')
+            messagebox.showerror(t("gui.msg.error_title"), t("gui.msg.bad_outname"))
             return
         self._reset_for_run(self.btn_merge_start)
         threading.Thread(
@@ -719,7 +720,7 @@ class ToolApp:
 
     def _convert_start(self):
         if not self._convert_files:
-            messagebox.showerror("錯誤", "請先選擇來源影片")
+            messagebox.showerror(t("gui.msg.error_title"), t("gui.msg.need_video"))
             return
         self._reset_for_run(self.btn_convert_start)
         threading.Thread(
@@ -848,7 +849,7 @@ class ToolApp:
         """關閉視窗前若有任務執行中，跳出確認提示"""
         if self.is_running:
             if not messagebox.askyesno(
-                "確認關閉", "任務執行中，確定要關閉視窗嗎？關閉後任務會被中止。"
+                t("gui.msg.close_title"), t("gui.msg.close_body")
             ):
                 return
         self.root.destroy()
