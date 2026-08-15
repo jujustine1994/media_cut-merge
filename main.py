@@ -86,14 +86,22 @@ def _com_state() -> str:
 
 # ---- 常數 ----
 
-AUDIO_VIDEO_FILETYPES = [
-    ('音訊/影像', '*.mp3 *.wav *.aac *.flac *.m4a *.ogg *.mp4 *.mkv *.avi *.mov *.wmv *.flv'),
-    ('所有檔案', '*.*')
-]
-VIDEO_FILETYPES = [
-    ('影像', '*.mp4 *.mkv *.avi *.mov *.wmv *.flv'),
-    ('所有檔案', '*.*')
-]
+# 萬用字元樣式是**資料**（檔案對話框的過濾條件），永遠不翻；
+# 只有旁邊的類型說明是介面文字。
+AUDIO_VIDEO_PATTERNS = '*.mp3 *.wav *.aac *.flac *.m4a *.ogg *.mp4 *.mkv *.avi *.mov *.wmv *.flv'
+VIDEO_PATTERNS = '*.mp4 *.mkv *.avi *.mov *.wmv *.flv'
+
+
+# ⚠ 這兩個以前是模組層級常數。t() 不可以在 import 時求值——語言是讀完
+# config 才設的，常數會凍結在預設語言。改成函式，呼叫時才查表。
+def audio_video_filetypes():
+    return [(t("gui.filetype.audio_video"), AUDIO_VIDEO_PATTERNS),
+            (t("gui.filetype.all"), '*.*')]
+
+
+def video_filetypes():
+    return [(t("gui.filetype.video"), VIDEO_PATTERNS),
+            (t("gui.filetype.all"), '*.*')]
 CONVERT_CODECS = {
     'MP3':  ['-vn', '-acodec', 'libmp3lame', '-q:a', '2'],
     'AAC':  ['-vn', '-acodec', 'aac', '-b:a', '192k'],
@@ -191,7 +199,7 @@ class ToolApp:
         self.cfg = load_config(CONFIG_PATH)
         i18n.set_lang(self.cfg.get("language"))
 
-        self.root.title("音影片工具")
+        self.root.title(t("gui.win.title"))
         self.root.resizable(False, False)
 
         self.msg_queue = queue.Queue()
@@ -219,9 +227,9 @@ class ToolApp:
         tab_split = ttk.Frame(self.notebook, padding=8)
         tab_merge = ttk.Frame(self.notebook, padding=8)
         tab_convert = ttk.Frame(self.notebook, padding=8)
-        self.notebook.add(tab_split, text="  分割  ")
-        self.notebook.add(tab_merge, text="  合併  ")
-        self.notebook.add(tab_convert, text="  轉檔  ")
+        self.notebook.add(tab_split, text=t("gui.tab.split"))
+        self.notebook.add(tab_merge, text=t("gui.tab.merge"))
+        self.notebook.add(tab_convert, text=t("gui.tab.convert"))
 
         self._build_split_tab(tab_split)
         self._build_merge_tab(tab_merge)
@@ -303,18 +311,18 @@ class ToolApp:
 
     def _build_split_tab(self, parent):
         # 來源檔案
-        frame_file = ttk.LabelFrame(parent, text=" 來源檔案 ", padding=8)
+        frame_file = ttk.LabelFrame(parent, text=t("gui.frame.source_file"), padding=8)
         frame_file.pack(fill="x", pady=(0, 8))
         frame_file.columnconfigure(0, weight=1)
 
         self.split_path_var = tk.StringVar()
         ttk.Entry(frame_file, textvariable=self.split_path_var,
                   state="readonly", width=44).grid(row=0, column=0, sticky="ew", padx=(0, 6))
-        ttk.Button(frame_file, text="選擇", command=self._split_pick_file,
+        ttk.Button(frame_file, text=t("gui.btn.pick"), command=self._split_pick_file,
                    width=6).grid(row=0, column=1)
 
         # 分割時間點
-        frame_time = ttk.LabelFrame(parent, text=" 分割時間點 ", padding=8)
+        frame_time = ttk.LabelFrame(parent, text=t("gui.frame.split_times"), padding=8)
         frame_time.pack(fill="x", pady=(0, 8))
 
         row_input = tk.Frame(frame_time)
@@ -337,9 +345,9 @@ class ToolApp:
         )
         self._split_time_entry.bind("<Return>", lambda e: self._split_add_time())
 
-        ttk.Button(row_input, text="新增", command=self._split_add_time,
+        ttk.Button(row_input, text=t("gui.btn.add_time"), command=self._split_add_time,
                    width=6).pack(side="left", padx=(6, 0))
-        ttk.Button(row_input, text="刪除選取", command=self._split_delete_time,
+        ttk.Button(row_input, text=t("gui.btn.del_time"), command=self._split_delete_time,
                    width=8).pack(side="left", padx=(6, 0))
 
         self.split_listbox = tk.Listbox(frame_time, height=4, font=("Consolas", 9))
@@ -347,29 +355,30 @@ class ToolApp:
 
         # 開始按鈕
         self.btn_split_start = ttk.Button(
-            parent, text="▶  開始分割", command=self._split_start, width=20
+            parent, text=t("gui.btn.split_start"), command=self._split_start, width=20
         )
         self.btn_split_start.pack(anchor="e", pady=(4, 0))
 
     def _split_pick_file(self):
         path = filedialog.askopenfilename(
-            title="選擇要分割的檔案", filetypes=AUDIO_VIDEO_FILETYPES
+            title=t("gui.dlg.pick_split"), filetypes=audio_video_filetypes()
         )
         if path:
             self.split_path_var.set(path)
 
     def _split_add_time(self):
-        t = self._get_ph_value(self.split_time_var, self._split_time_ph)
-        if not t:
+        # 變數不可叫 t（遮蔽 i18n.t）——見 _split_worker 的註解
+        tp = self._get_ph_value(self.split_time_var, self._split_time_ph)
+        if not tp:
             messagebox.showerror("格式錯誤", "請輸入時間點")
             return
-        if not validate_time(t):
+        if not validate_time(tp):
             messagebox.showerror("格式錯誤", "格式須為 HH:MM:SS（例：00:01:30）")
             return
-        if t in self.split_listbox.get(0, "end"):
-            messagebox.showerror("重複", f"{t} 已存在清單中")
+        if tp in self.split_listbox.get(0, "end"):
+            messagebox.showerror("重複", f"{tp} 已存在清單中")
             return
-        self.split_listbox.insert("end", t)
+        self.split_listbox.insert("end", tp)
         self.split_time_var.set(self._split_time_ph)
         self._split_time_entry.configure(foreground="grey")
 
@@ -402,15 +411,18 @@ class ToolApp:
 
             segments = []
             prev = "00:00:00"
-            for i, t in enumerate(time_points):
-                segments.append((prev, t, i + 1))
-                prev = t
+            # ⚠ 迴圈變數不可叫 t：會遮蔽 i18n 的 t()，之後同一個 scope 裡
+            # 呼叫 t("...") 會變成「對字串做呼叫」而拋 TypeError。
+            for i, tp in enumerate(time_points):
+                segments.append((prev, tp, i + 1))
+                prev = tp
             segments.append((prev, None, len(time_points) + 1))
 
             _write_log_header(LOG_TEXT["split_start"].format(
                 name=os.path.basename(input_path), count=len(segments)))
 
-            self._set_progress(0, len(segments), f"0 / {len(segments)} 段")
+            self._set_progress(0, len(segments),
+                               t("gui.status.segments", current=0, total=len(segments)))
             success_count = 0
             for start, end, idx in segments:
                 out_path = os.path.join(base_dir, f"{base_name}_part{idx}{ext}")
@@ -419,25 +431,31 @@ class ToolApp:
                 )
                 if result.returncode != 0:
                     err = (result.stderr.strip().splitlines()[-1]
-                           if result.stderr.strip() else "未知錯誤")
-                    self._log(f"[ERROR] 第 {idx} 段失敗：{err}")
-                    self._log(f"第 {idx} 段 ffmpeg -> returncode {result.returncode}",
+                           if result.stderr.strip() else t("gui.log.unknown_error"))
+                    self._log(t("gui.log.seg_fail", idx=idx, err=err))
+                    self._log(t("gui.log.seg_returncode", idx=idx,
+                                code=result.returncode),
                               "ERROR", to_file=True,
                               log_msg=LOG_TEXT["split_seg_error"].format(
                                   idx=idx, code=result.returncode))
                 else:
-                    self._log(f"[OK] 第 {idx} 段：{os.path.basename(out_path)}")
+                    self._log(t("gui.log.seg_ok", idx=idx,
+                                name=os.path.basename(out_path)))
                     success_count += 1
-                self._set_progress(idx, len(segments), f"{idx} / {len(segments)} 段")
+                self._set_progress(idx, len(segments),
+                                   t("gui.status.segments", current=idx,
+                                     total=len(segments)))
 
             ok = success_count == len(segments)
             if ok:
-                self._log(f"\n[OK] 分割完成！共 {len(segments)} 個檔案")
+                self._log(t("gui.log.split_done", count=len(segments)))
             else:
-                self._log(f"\n[WARNING] 完成（{success_count}/{len(segments)} 成功）")
+                self._log(t("gui.log.split_partial", success=success_count,
+                            total=len(segments)))
             elapsed = int(time.time() - task_start)
             mins, secs = elapsed // 60, elapsed % 60
-            self._log(f"{'成功' if ok else '失敗'}，耗時 {mins}分{secs}秒",
+            self._log(t("gui.log.elapsed_ok" if ok else "gui.log.elapsed_fail",
+                        minutes=mins, seconds=secs),
                       "OK" if ok else "FAIL", to_file=True,
                       log_msg=LOG_TEXT["task_ok" if ok else "task_fail"].format(
                           minutes=mins, seconds=secs))
@@ -448,7 +466,7 @@ class ToolApp:
             self._done("", False)
 
     def _build_merge_tab(self, parent):
-        frame_files = ttk.LabelFrame(parent, text=" 來源檔案（依序排列）", padding=8)
+        frame_files = ttk.LabelFrame(parent, text=t("gui.frame.merge_files"), padding=8)
         frame_files.pack(fill="x", pady=(0, 8))
 
         self._merge_files = []  # 儲存完整路徑
@@ -457,18 +475,18 @@ class ToolApp:
 
         row_btn = tk.Frame(frame_files)
         row_btn.pack(fill="x")
-        ttk.Button(row_btn, text="+ 新增", command=self._merge_add_file,
+        ttk.Button(row_btn, text=t("gui.btn.merge_add"), command=self._merge_add_file,
                    width=8).pack(side="left")
-        ttk.Button(row_btn, text="✕ 移除", command=self._merge_remove_file,
+        ttk.Button(row_btn, text=t("gui.btn.merge_remove"), command=self._merge_remove_file,
                    width=8).pack(side="left", padx=4)
-        ttk.Button(row_btn, text="↑ 上移", command=self._merge_move_up,
+        ttk.Button(row_btn, text=t("gui.btn.merge_up"), command=self._merge_move_up,
                    width=8).pack(side="left")
-        ttk.Button(row_btn, text="↓ 下移", command=self._merge_move_down,
+        ttk.Button(row_btn, text=t("gui.btn.merge_down"), command=self._merge_move_down,
                    width=8).pack(side="left", padx=4)
-        ttk.Button(row_btn, text="清空列表", command=self._merge_clear_files,
+        ttk.Button(row_btn, text=t("gui.btn.merge_clear"), command=self._merge_clear_files,
                    width=8).pack(side="left", padx=4)
 
-        frame_outname = ttk.LabelFrame(parent, text=" 輸出檔名 ", padding=8)
+        frame_outname = ttk.LabelFrame(parent, text=t("gui.frame.outname"), padding=8)
         frame_outname.pack(fill="x", pady=(0, 8))
         frame_outname.columnconfigure(0, weight=1)
 
@@ -481,7 +499,7 @@ class ToolApp:
         self.merge_outname_ext_label.grid(row=0, column=1)
 
         self.btn_merge_start = ttk.Button(
-            parent, text="▶  開始合併", command=self._merge_start, width=20
+            parent, text=t("gui.btn.merge_start"), command=self._merge_start, width=20
         )
         self.btn_merge_start.pack(anchor="e", pady=(4, 0))
 
@@ -493,7 +511,7 @@ class ToolApp:
         t0 = time.monotonic()
         try:
             paths = filedialog.askopenfilenames(
-                title="選擇要合併的檔案（可多選）", filetypes=AUDIO_VIDEO_FILETYPES
+                title=t("gui.dlg.pick_merge"), filetypes=audio_video_filetypes()
             )
         except Exception as e:
             _write_log(LOG_TEXT["pick_exception"].format(
@@ -522,10 +540,10 @@ class ToolApp:
                 "WARN"
             )
             if never_opened:
-                self._log_raw(f"（選檔視窗沒有開啟就直接回空（{elapsed:.3f} 秒），"
-                              "這是已知問題，請重開程式並回報 logs\\app.log）\n")
+                self._log_raw(t("gui.log.picker_no_window",
+                                elapsed=f"{elapsed:.3f}"))
             else:
-                self._log_raw("（未加入任何檔案）\n")
+                self._log_raw(t("gui.log.picker_cancelled"))
             return
 
         self._merge_files.extend(paths)
@@ -619,8 +637,8 @@ class ToolApp:
                 safe_files.append(link_path)
 
             build_merge_list(safe_files, list_path)
-            self._start_indeterminate("合併中...")
-            self._log(f"[INFO] 合併 {len(files)} 個檔案...")
+            self._start_indeterminate(t("gui.status.merging"))
+            self._log(t("gui.log.merge_running", count=len(files)))
 
             cmd_builder = lambda p: ['ffmpeg', '-y', '-f', 'concat', '-safe', '0',
                                       '-i', list_path, '-c', 'copy', p]
@@ -644,19 +662,20 @@ class ToolApp:
             ok = False
         elif result.returncode != 0:
             err = (result.stderr.strip().splitlines()[-1]
-                   if result.stderr.strip() else "未知錯誤")
-            self._log(f"[ERROR] 合併失敗：{err}")
-            self._log(f"合併 ffmpeg -> returncode {result.returncode}", "ERROR",
+                   if result.stderr.strip() else t("gui.log.unknown_error"))
+            self._log(t("gui.log.merge_fail", err=err))
+            self._log(t("gui.log.merge_returncode", code=result.returncode), "ERROR",
                       to_file=True,
                       log_msg=LOG_TEXT["merge_error"].format(code=result.returncode))
             ok = False
         else:
-            self._log(f"[OK] 合併完成：{os.path.basename(out_path)}")
+            self._log(t("gui.log.merge_ok", name=os.path.basename(out_path)))
             ok = True
 
         elapsed = int(time.time() - task_start)
         mins, secs = elapsed // 60, elapsed % 60
-        self._log(f"{'成功' if ok else '失敗'}，耗時 {mins}分{secs}秒",
+        self._log(t("gui.log.elapsed_ok" if ok else "gui.log.elapsed_fail",
+                    minutes=mins, seconds=secs),
                   "OK" if ok else "FAIL", to_file=True,
                   log_msg=LOG_TEXT["task_ok" if ok else "task_fail"].format(
                       minutes=mins, seconds=secs))
@@ -664,18 +683,18 @@ class ToolApp:
 
     def _build_convert_tab(self, parent):
         # 來源影片
-        frame_file = ttk.LabelFrame(parent, text=" 來源影片 ", padding=8)
+        frame_file = ttk.LabelFrame(parent, text=t("gui.frame.source_video"), padding=8)
         frame_file.pack(fill="x", pady=(0, 8))
         frame_file.columnconfigure(0, weight=1)
 
         self._convert_files = ()
-        self._convert_label = ttk.Label(frame_file, text="未選擇", width=44, anchor="w")
+        self._convert_label = ttk.Label(frame_file, text=t("gui.lbl.no_file"), width=44, anchor="w")
         self._convert_label.grid(row=0, column=0, sticky="ew", padx=(0, 6))
-        ttk.Button(frame_file, text="選擇", command=self._convert_pick_file,
+        ttk.Button(frame_file, text=t("gui.btn.pick"), command=self._convert_pick_file,
                    width=6).grid(row=0, column=1)
 
         # 輸出格式
-        frame_fmt = ttk.LabelFrame(parent, text=" 輸出格式 ", padding=8)
+        frame_fmt = ttk.LabelFrame(parent, text=t("gui.frame.format"), padding=8)
         frame_fmt.pack(fill="x", pady=(0, 8))
 
         self.convert_fmt_var = tk.StringVar(value="MP3")
@@ -686,17 +705,17 @@ class ToolApp:
 
         # 開始按鈕
         self.btn_convert_start = ttk.Button(
-            parent, text="▶  開始轉檔", command=self._convert_start, width=20
+            parent, text=t("gui.btn.convert_start"), command=self._convert_start, width=20
         )
         self.btn_convert_start.pack(anchor="e", pady=(4, 0))
 
     def _convert_pick_file(self):
         paths = filedialog.askopenfilenames(
-            title="選擇要轉檔的影片", filetypes=VIDEO_FILETYPES
+            title=t("gui.dlg.pick_convert"), filetypes=video_filetypes()
         )
         if paths:
             self._convert_files = paths
-            self._convert_label.config(text=f"已選擇 {len(paths)} 個檔案")
+            self._convert_label.config(text=t("gui.lbl.selected_count", count=len(paths)))
 
     def _convert_start(self):
         if not self._convert_files:
@@ -731,9 +750,10 @@ class ToolApp:
 
                     if result.returncode != 0:
                         err = (result.stderr.strip().splitlines()[-1]
-                               if result.stderr.strip() else "未知錯誤")
-                        self._log(f"[ERROR] 轉檔失敗：{err}")
-                        self._log(f"第 {idx} 個檔案 ffmpeg -> returncode {result.returncode}",
+                               if result.stderr.strip() else t("gui.log.unknown_error"))
+                        self._log(t("gui.log.convert_fail", err=err))
+                        self._log(t("gui.log.convert_returncode", idx=idx,
+                                    code=result.returncode),
                                   "ERROR", to_file=True,
                                   log_msg=LOG_TEXT["convert_error"].format(
                                       idx=idx, code=result.returncode))
@@ -744,7 +764,8 @@ class ToolApp:
                             first_success_dir = os.path.dirname(input_path)
                 except Exception as e:
                     self._log(f"[ERROR] {e}")
-                    self._log(f"第 {idx} 個檔案 -> {type(e).__name__}", "ERROR",
+                    self._log(t("gui.log.convert_item_error", idx=idx,
+                                exc=type(e).__name__), "ERROR",
                               to_file=True,
                               log_msg=LOG_TEXT["convert_item_error"].format(
                                   idx=idx, exc=type(e).__name__))
@@ -752,27 +773,28 @@ class ToolApp:
 
             ok = success_count > 0
             if ok:
-                self._log(f"\n[OK] 完成！（{success_count}/{total} 成功）")
+                self._log(t("gui.log.convert_done", success=success_count, total=total))
             else:
-                self._log(f"\n[WARNING] 全部失敗（0/{total}）")
+                self._log(t("gui.log.convert_all_fail", total=total))
             elapsed = int(time.time() - task_start)
             mins, secs = elapsed // 60, elapsed % 60
-            self._log(f"{'成功' if ok else '失敗'}，耗時 {mins}分{secs}秒",
+            self._log(t("gui.log.elapsed_ok" if ok else "gui.log.elapsed_fail",
+                        minutes=mins, seconds=secs),
                       "OK" if ok else "FAIL", to_file=True,
                       log_msg=LOG_TEXT["task_ok" if ok else "task_fail"].format(
                           minutes=mins, seconds=secs))
             self._done(first_success_dir, ok)
         except Exception as e:
-            self._log(f"\n[ERROR] 未預期錯誤：{e}")
+            self._log(t("gui.log.unexpected", exc=e))
             self._log(f"{type(e).__name__}", "ERROR", to_file=True)
             self._done("", False)
 
     def _build_progress_area(self, pad):
-        frame = ttk.LabelFrame(self.root, text=" 處理進度 ", padding=8)
+        frame = ttk.LabelFrame(self.root, text=t("gui.frame.progress"), padding=8)
         frame.grid(row=2, column=0, sticky="ew", **pad)
         frame.columnconfigure(0, weight=1)
 
-        self.progress_label = ttk.Label(frame, text="等待開始...")
+        self.progress_label = ttk.Label(frame, text=t("gui.status.idle"))
         self.progress_label.grid(row=0, column=0, sticky="w")
         self.progress_bar = ttk.Progressbar(frame, mode="determinate", length=460)
         self.progress_bar.grid(row=1, column=0, sticky="ew", pady=(4, 8))
@@ -784,11 +806,11 @@ class ToolApp:
         frame_btn = tk.Frame(self.root)
         frame_btn.grid(row=3, column=0, pady=(0, 12))
         self.btn_open_folder = ttk.Button(
-            frame_btn, text="開啟資料夾", command=self._open_output_folder
+            frame_btn, text=t("gui.btn.open_folder"), command=self._open_output_folder
         )
         # 預設不 pack，成功完成後才顯示
 
-        self._log_raw("請設定完成後按「開始」。\n")
+        self._log_raw(t("gui.log.hint"))
 
     # ---------- Placeholder helpers ----------
 
@@ -848,7 +870,7 @@ class ToolApp:
         self.progress_bar.config(mode="determinate")
         self.progress_bar["value"] = 0
         self.progress_bar["maximum"] = 1
-        self.progress_label.config(text="準備中...")
+        self.progress_label.config(text=t("gui.status.preparing"))
 
     # ---- 執行緒安全 UI 更新 ----
 
@@ -909,10 +931,10 @@ class ToolApp:
                         self._last_output_dir = output_dir
                         self.progress_bar["maximum"] = 1
                         self.progress_bar["value"] = 1
-                        self.progress_label.config(text="完成！")
+                        self.progress_label.config(text=t("gui.status.done"))
                         self.btn_open_folder.pack(side="left")
                     else:
-                        self.progress_label.config(text="發生錯誤，請查看上方記錄")
+                        self.progress_label.config(text=t("gui.status.failed"))
         except queue.Empty:
             pass
         except Exception as e:
