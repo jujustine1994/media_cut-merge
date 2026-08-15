@@ -78,7 +78,7 @@ tests/
 ### 執行緒安全
 
 背景執行緒（worker）只允許呼叫：
-- `self._log(msg)` — 寫入 log
+- `self._log(msg, level, to_file, log_msg)` — 推 UI 記錄（`to_file=True` 時同時落檔）
 - `self._set_progress(current, total, label)` — 更新進度條（determinate）
 - `self._start_indeterminate(label)` — 切換為 indeterminate 動畫
 - `self._done(output_dir, success)` — 完成通知
@@ -110,6 +110,7 @@ tests/
 | subprocess encoding | `errors='replace'` | 防止 Windows 中文路徑 stderr UnicodeDecodeError |
 | log 路徑 | `_find_project_root()` 往上找 `launcher.ps1` | 不可寫死 `SCRIPT_DIR/../logs`，主程式在根目錄時會寫到專案外污染別的專案 |
 | `_log(to_file=)` | 預設 `False` | fail-closed：漏帶旗標時是少記，不是把敏感資料誤記上磁碟 |
+| `_log(log_msg=)` | 選填，落檔用的另一份文字 | UI 那份走 `t()` 跟語言變、落檔那份走 `LOG_TEXT` 固定繁中，但仍維持**一個呼叫同時處理兩邊**（不維護兩套呼叫，否則一定有地方漏記）。不給就退回用 `msg` |
 | 錯誤行內容 | 只記 `type(e).__name__` + returncode | 禁止 `f"{e}"`，例外訊息會挾帶完整路徑與 stderr 片段 |
 
 ## 多語言（i18n）
