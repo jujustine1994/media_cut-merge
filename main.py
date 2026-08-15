@@ -397,6 +397,9 @@ class ToolApp:
     def _merge_add_file(self):
         # 診斷中（見 docs/PITFALLS.md「合併清單加不進檔案」）：對話框回空時原本是
         # 靜默跳過，什麼線索都留不下，所以這裡把回傳值與 COM 狀態一併落檔。
+        # 對話框「開了多久」是判讀關鍵：秒回代表視窗根本沒開起來（＝故障），
+        # 開了好幾秒才回空代表使用者真的看到視窗並按取消（＝正常）。
+        t0 = time.monotonic()
         try:
             paths = filedialog.askopenfilenames(
                 title="選擇要合併的檔案（可多選）", filetypes=AUDIO_VIDEO_FILETYPES
@@ -411,17 +414,23 @@ class ToolApp:
             )
             return
 
+        elapsed = time.monotonic() - t0
+
         if not paths:
-            # 空回傳有兩種可能，Python 端無法區分：①使用者按取消（正常）
-            # ②Tk 的 COM 對話框故障（靜默回空，永久性，重啟才會好）。
-            # 一律落檔；判讀方式：使用者明明有選檔卻出現這行 = ②。
+            # 空回傳有兩種可能：①使用者按取消（正常）②對話框根本沒開起來（故障）。
+            # 用 elapsed 區分：人類不可能在 0.5 秒內開視窗＋按取消。
+            never_opened = elapsed < 0.5
             _write_log(
                 f"合併選檔回傳空 | type={type(paths).__name__} repr={paths!r} | "
+                f"耗時 {elapsed:.3f}s{'（視窗未開啟）' if never_opened else '（使用者取消）'} | "
                 f"COM {_com_state()} | 清單現有 {len(self._merge_files)} 筆",
                 "WARN"
             )
-            self._log_raw("（未加入任何檔案。若你剛才確實有選檔案，"
-                          "這是已知問題，請重開程式並回報 logs\\app.log）\n")
+            if never_opened:
+                self._log_raw(f"（選檔視窗沒有開啟就直接回空（{elapsed:.3f} 秒），"
+                              "這是已知問題，請重開程式並回報 logs\\app.log）\n")
+            else:
+                self._log_raw("（未加入任何檔案）\n")
             return
 
         self._merge_files.extend(paths)
