@@ -45,6 +45,14 @@ def _all_texts(widget, out=None):
     if isinstance(widget, ttk.Notebook):
         for tab in widget.tabs():
             out.append(widget.tab(tab, "text"))
+    # ⚠ tk.Text / ScrolledText 的內容 cget("text") 完全掃不到。說明文字、
+    # 執行記錄常常整片住在這裡，漏掃就等於那塊沒被檢查。
+    if isinstance(widget, tk.Text):
+        content = widget.get("1.0", "end-1c")
+        if content.strip():
+            out.extend(line for line in content.splitlines() if line.strip())
+    if isinstance(widget, tk.Listbox):
+        out.extend(str(v) for v in widget.get(0, "end"))
     for child in widget.winfo_children():
         _all_texts(child, out)
     return out
@@ -85,9 +93,12 @@ def test_gui_builds_in_every_language_without_residual_keys(lang, app_factory):
     assert i18n.get_lang() == lang, "App 沒有依 config 設定語言"
 
     texts = _all_texts(root) + [root.title()]
-    texts.append(app.log_text.get("1.0", "end-1c"))
     residual = [s for s in texts if _looks_like_a_key(s)]
     assert not residual, f"{lang} 畫面上有殘留的 key：{residual}"
+
+    # ScrolledText 裡的初始提示必須真的被走訪到（漏掃 tk.Text 是常見死角）
+    assert i18n._strings(lang)["gui.log.hint"].strip() in texts, \
+        f"{lang} 的 ScrolledText 提示沒被收集到，或沒吃到譯文"
 
     # 譯文真的被套上去了（不是整批退回母表）
     table = i18n._strings(lang)

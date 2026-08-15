@@ -74,11 +74,12 @@ def _com_state() -> str:
     """
     try:
         import ctypes
-        t, q = ctypes.c_int(-1), ctypes.c_int(-1)
-        hr = ctypes.windll.ole32.CoGetApartmentType(ctypes.byref(t), ctypes.byref(q))
+        # 變數不可命名 t：會遮蔽 i18n.t（見本檔頂端 import）
+        apt, q = ctypes.c_int(-1), ctypes.c_int(-1)
+        hr = ctypes.windll.ole32.CoGetApartmentType(ctypes.byref(apt), ctypes.byref(q))
         if hr != 0:
             return LOG_TEXT["com_not_entered"].format(hr=f"{hr & 0xFFFFFFFF:08X}")
-        name = {0: "STA", 1: "MTA", 2: "NA", 3: "MAINSTA"}.get(t.value, str(t.value))
+        name = {0: "STA", 1: "MTA", 2: "NA", 3: "MAINSTA"}.get(apt.value, str(apt.value))
         return f"{name}/qual={q.value}"
     except Exception:
         return LOG_TEXT["com_unknown"]
@@ -113,8 +114,8 @@ CONVERT_EXT = {'MP3': '.mp3', 'AAC': '.aac', 'WAV': '.wav', 'FLAC': '.flac'}
 
 # ---- 純函式（可單元測試）----
 
-def validate_time(t):
-    parts = t.strip().split(':')
+def validate_time(value):
+    parts = value.strip().split(':')
     if len(parts) != 3:
         return False
     try:
@@ -124,8 +125,8 @@ def validate_time(t):
         return False
 
 
-def time_to_seconds(t):
-    h, m, s = t.strip().split(':')
+def time_to_seconds(value):
+    h, m, s = value.strip().split(':')
     return int(h) * 3600 + int(m) * 60 + int(s)
 
 

@@ -212,6 +212,37 @@ def test_machine_keys_are_not_in_any_locale(lang):
         assert v not in table.values(), f"{lang} 把機器鍵 {v!r} 當成譯文了"
 
 
+# ── 不得有任何名稱遮蔽 i18n.t ────────────────────────────────────────────
+
+def test_nothing_shadows_the_translation_function():
+    """區域變數／參數叫 `t` 會遮蔽 `from i18n import t`，同一個 scope 裡的
+    `t("gui.x")` 就變成「對字串做呼叫」而拋 TypeError——而且只有那條路徑被
+    走到時才炸，靜態看不出來。本專案已踩過一次（_split_worker 的迴圈變數）。
+
+    更陰險的版本是專案本來就有 `def t(text)` 這種文字 helper：加上
+    `from i18n import t` 之後，所有 t(...) 呼叫**靜默改打到翻譯函式**，
+    不 crash、不報錯，畫面整片變空白。
+    """
+    offenders = []
+    for path in _scannable():
+        if path.name == "i18n.py":       # t() 的家
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name == "t":
+                    offenders.append(f"{path.name}:{node.lineno} def t()")
+                for a in (node.args.args + node.args.kwonlyargs
+                          + node.args.posonlyargs):
+                    if a.arg == "t":
+                        offenders.append(f"{path.name}:{node.lineno} "
+                                         f"{node.name}() 的參數 t")
+            if (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+                    and node.id == "t"):
+                offenders.append(f"{path.name}:{node.lineno} 賦值給 t")
+    assert not offenders, "有名稱遮蔽 i18n.t：\n  " + "\n  ".join(offenders)
+
+
 @pytest.mark.parametrize("lang", LANGS)
 def test_ffmpeg_arguments_never_go_through_t(lang):
     """CONVERT_CODECS 的每一個參數都不可以出現在任何語言檔裡。"""
