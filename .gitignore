@@ -5,3 +5,4 @@ __pycache__/
 *.log
 logs/
 _merge_list_tmp.txt
+config.json

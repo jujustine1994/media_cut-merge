@@ -2,6 +2,57 @@
 
 > 現狀總覽見 ARCHITECTURE.md，本檔案只記錄歷史。
 
+## 2026-08-15
+
+### 新增（多語言 i18n：繁體中文／简体中文／English／日本語）
+- `i18n.py`：介面文字查表核心。查找順序「目標語言 → 繁中母表 → key 本身」，永不 raise、永不回空字串
+- `config.py` + `config.json`（已加入 `.gitignore`）：`language` 預設**空字串**，用來分辨「還沒選過」與「選了繁中」
+- `locales/{zh_tw,zh_cn,en,ja}.py`：各 74 條字串，key 集合與 placeholder 四語完全一致
+- `logtext.py`：`logs/app.log` 的訊息字串，**固定繁體中文不跟介面語言走**。抽出來的另一個目的是讓 `main.py` 能被「不得寫死中日文」那條測試涵蓋（否則只能整檔豁免＝等於把測試關掉）
+- 首次啟動語言選擇視窗（全英文，不翻譯——那時還不知道使用者要哪個語言）；直接關掉＝採用第一個選項並照樣存檔
+- 主視窗第一列語言下拉（本工具無設定視窗），選完存檔並跳英文重啟提示。**重開生效，不做即時切換**
+
+### 變更
+- `main.py`：127 條寫死的中日文字面全部改走 `t()`（AST 逐節點取代）
+- `AUDIO_VIDEO_FILETYPES` / `VIDEO_FILETYPES` 兩個模組層級常數改為函式 `audio_video_filetypes()` / `video_filetypes()`：`t()` 不可在 import 時求值，常數會凍結在預設語言。萬用字元樣式留在 `AUDIO_VIDEO_PATTERNS` / `VIDEO_PATTERNS`（那是資料）
+- `_log()` 新增 `log_msg` 參數：一個呼叫同時寫檔（繁中）＋推 UI（跟語言走）；不給 `log_msg` 時行為與原本一致
+- 主視窗 grid row 0/1/2 整批下移為 1/2/3（讓出第 0 列給語言列）
+
+### 修復
+- `_split_worker()` 與 `_split_add_time()` 的區域變數 `t` 會遮蔽 `i18n.t`，導致同 scope 內 `t("...")` 變成對字串做呼叫而拋 `TypeError`（分割功能會整個失效）。改名為 `tp`
+- **上面那條是遷移當場炸出的真 bug，不是預防性修改**：`_split_worker()`（`main.py` 第 406 行起）的
+  `for i, t in enumerate(...)` 讓迴圈之後所有 `t(...)` 都變成「對字串做呼叫」→ `TypeError`，
+  **分割功能整條路徑會掛掉**；`_split_add_time()`（第 370 行）同樣中招。
+  另有三處潛伏但同樣危險：`_com_state()`（第 68 行）、`validate_time(t)`（第 117 行）、
+  `time_to_seconds(t)`（第 128 行），已一併改名為 `apt` / `value`——
+  這三個函式的呼叫端全部是位置參數，改參數名不影響任何行為
+- 已加 `test_nothing_shadows_the_translation_function` 永久釘住：AST 掃描，任何函式把 `t` 綁成
+  參數或區域名稱就紅燈。這類 bug 靜態看程式碼完全正常，只有那條 code path 真的跑到才炸，人眼複查擋不住
+
+### 判斷紀錄
+- **判成「資料」不翻**：輸出檔名樣板 `_part{n}` / `_merge`、暫存前綴 `_tmp_` / `_merge_list_` / `_merge_tmp_`
+  （`main.py` 第 165、430、623–624 行）、concat 清單的 `file '...'` 格式、ffmpeg 全部參數與 codec 名
+  （`CONVERT_CODECS`，第 106–111 行）、`CONVERT_EXT` 的副檔名與格式選項 `MP3`/`AAC`/`WAV`/`FLAC`
+  （第 112 行；這四個同時是 `CONVERT_CODECS` 的鍵，翻了 `CONVERT_EXT[fmt]` 當場 `KeyError`）、
+  檔案類型萬用字元樣式、Windows 檔名非法字元集合、`"00:00:00"` placeholder、log level 與 queue 訊息型別
+- **`i18n.ui_font()` 建了但不呼叫**（`i18n.py` 第 98 行）：一接字型繁中外觀就跟遷移前不一樣，
+  無法用「畫面長得一模一樣」驗證遷移沒改壞東西
+- **未動 `PITFALLS.md` 的未解 bug**（合併清單加不進檔案）：診斷儀器完整保留，一行沒碰
+- 其餘順手發現但未處理的問題（缺 `requirements.txt`、文件未收進 `docs/` 等）與待校對譯文見 `TODO.md`
+
+### 測試（18 → 96 條，既有 18 條一條未改）
+- `tests/test_i18n.py`：key 集合一致／placeholder 一致／不得寫死中日文（豁免清單只有 `i18n.py` 與 `logtext.py`，並用反向測試釘住 `main.py` 一定在掃描範圍且範圍非空）
+- `tests/test_gui_build.py`：四語各建置一次 GUI（`withdraw()`，不進 mainloop），確認畫面無殘留 key
+- `tests/test_first_run_language.py`：首次啟動視窗開得起來、點下去有存檔、第二次不再跳
+- `tests/test_output_names.py`：四語的輸出檔名／暫存檔名／concat 清單格式／ffmpeg 參數必須完全相同（ffmpeg 全程 mock）
+- `tests/conftest.py`：session 級共用 `tk_root`（避免反覆建立 Tcl 直譯器造成間歇性 `TclError`）
+
+### 不翻譯的東西（資料，翻了是靜默污染）
+輸出檔名樣板 `_part{n}` / `_merge`、暫存檔名前綴 `_tmp_` / `_merge_list_` / `_merge_tmp_`、
+concat 清單的 `file '...'` 格式、ffmpeg 參數與 codec 名、`CONVERT_EXT` 的副檔名、
+格式選項 MP3/AAC/WAV/FLAC（同時是 `CONVERT_CODECS` 的鍵）、檔案類型的萬用字元樣式、
+Windows 檔名非法字元集合、`logs/app.log` 的內容。
+
 ## 2026-08-04
 
 ### 修復
