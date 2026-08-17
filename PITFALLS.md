@@ -84,3 +84,15 @@ console 無例外、清空無效）。
 - 原因：batch 的 `if ( ... )` 區塊解析器看到 `)` 就認為 if 區塊結束，後面的 `:` 就成了非法字元
 - 解法：if 區塊內的 echo 和 set /p 文字一律不放 `(` 和 `)`，改用 `-` 或其他符號代替
 - 禁止：`set /p VAR=說明文字 (按 Enter 同意):` ← 這樣寫一定壞
+
+### [區域變數 `t` 遮蔽翻譯函式，分割功能整條掛掉]（2026-08-15 導入多語言時發現）
+- **症狀**：按「開始分割」完全沒反應，輸出清單是空的。console 有 `TypeError: 'str' object is not callable`，但一般使用不會看 console
+- **原因**：`_split_worker` 的 `for i, t in enumerate(...)` 把 `from i18n import t` 遮蔽掉了。
+  迴圈結束後 `t` 還是最後一次迭代的字串，後面的 `t("gui.status.segments")` 變成「對字串做呼叫」。
+  `_split_add_time` 同樣中。另有 `_com_state` 的 `t`、`validate_time(t)`、`time_to_seconds(t)` 三處潛伏
+- **解法**：全部改名（`apt` / `value`，呼叫端都是位置參數所以行為不變），
+  並加 `test_nothing_shadows_the_translation_function` 永久釘住
+- **禁止**：不要再用 `t` 當任何區域變數、迴圈變數或函式參數的名字。
+  要新增翻譯字串前，先跑那條測試確認沒有新的遮蔽
+- **教訓**：抓到它的不是 GUI 建置測試（那個照樣全綠），是**檔名基準測試**——
+  `out_paths` 變成 `[]` 才露餡。只驗「畫面建得起來」不夠，要驗「功能真的有產出」
