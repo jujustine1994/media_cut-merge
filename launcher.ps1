@@ -57,7 +57,13 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     if ($ans -eq "" -or $ans -ieq "Y") {
         if (Get-Command winget -ErrorAction SilentlyContinue) {
             Write-Host "[INFO] 透過 winget 安裝 Python，請稍候..." -ForegroundColor Gray
-            winget install --id Python.Python.3 -e --silent --accept-source-agreements --accept-package-agreements --override "/quiet PrependPath=1 Include_pip=1"
+            # 不帶次版號的 Python.Python.3 已被上游下架（地雷十二），版號一定要寫
+            winget install --id Python.Python.3.13 -e --silent --accept-source-agreements --accept-package-agreements --override "/quiet PrependPath=1 Include_pip=1"
+            if ($LASTEXITCODE -ne 0) {
+                Write-Log "winget install Python.Python.3.13 失敗（exit $LASTEXITCODE）" "ERROR"
+                Write-Host "[ERROR] Python 安裝失敗（winget exit $LASTEXITCODE），請確認網路連線後重新執行。" -ForegroundColor Red
+                Read-Host "按 Enter 關閉"; exit 1
+            }
         } else {
             Write-Log "找不到 winget，無法自動安裝 Python" "ERROR"
             Write-Host "[ERROR] 找不到 winget，請手動至 https://www.python.org/ 下載安裝後重新執行。" -ForegroundColor Red

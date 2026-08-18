@@ -2,6 +2,15 @@
 
 > 現狀總覽見 ARCHITECTURE.md，本檔案只記錄歷史。
 
+## 2026-08-17
+
+### 修正：launcher.ps1 winget Python ID 補上次版號
+`winget install --id Python.Python.3`（不帶次版號）已被上游下架，靜默失效。
+本專案沒有 venv、直接跑系統 `python main.py`（tkinter + 標準函式庫，無第三方
+套件），屬於 `windows-tool-pitfalls.md` 地雷十二列的「需要系統 Python」例外，
+故不改走 uv，改成 `Python.Python.3.13`（2026-08-17 `winget show` 實測有效）並補
+`$LASTEXITCODE` 檢查。
+
 ## 2026-08-15
 
 ### 新增（多語言 i18n：繁體中文／简体中文／English／日本語）
