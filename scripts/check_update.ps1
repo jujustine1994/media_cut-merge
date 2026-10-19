@@ -43,14 +43,14 @@ try {
         exit 0
     }
 
-    # 只同步「程式碼」路徑，排除 config.json（.gitignore 已排除，這裡再保險一次）、
-    # logs/、__pycache__、.pytest_cache 這些本機產生物或使用者資料。
-    # 本專案沒有 requirements.txt（無第三方套件，見 CHANGELOG.md 2026-08-17），
-    # 這裡仍列出以沿用範本慣例，Where-Object 會自動濾掉不存在的路徑。
+    # 只同步「程式碼」路徑，不碰 logs/、__pycache__、.pytest_cache 這些本機產生物。
+    # src/config.json 雖然在 src/ 底下，但它被 .gitignore 排除、不在遠端版本裡，
+    # git checkout / add 都不會動到它。
+    # ⚠ 這份清單是「本機這一版」的結構。日後再搬目錄，舊版用戶按更新時用的是
+    #   舊清單，checkout 到不存在的路徑會整批失敗——搬目錄前要先想好過渡方式。
     $CodePaths = @(
-        "main.py", "i18n.py", "config.py", "logtext.py", "update_checker.py",
-        "locales", "tests", "docs", "scripts",
-        "requirements.txt", "launcher.ps1"
+        "src", "tests", "docs", "scripts",
+        "requirements.txt", "requirements_test.txt", "launcher.ps1"
     )
     Get-ChildItem -Path . -Filter "*.bat" -File | ForEach-Object { $CodePaths += $_.Name }
     $CodePaths = $CodePaths | Where-Object { Test-Path $_ }

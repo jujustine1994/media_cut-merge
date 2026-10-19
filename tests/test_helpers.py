@@ -1,5 +1,5 @@
 import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
 import pytest
 from main import validate_time, time_to_seconds, build_split_cmd, build_merge_list, build_convert_cmd, format_elapsed

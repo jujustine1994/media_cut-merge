@@ -4,6 +4,14 @@
 
 ## 2026-10-20
 
+### 變更：目錄結構改成 src/ + docs/
+- `main.py`、`config.py`、`i18n.py`、`logtext.py`、`update_checker.py`、`locales/` → `src/`；`config.json` 跟著 `config.py` 搬到 `src/config.json`（使用者設定原樣保留）
+- `ARCHITECTURE.md`、`CHANGELOG.md`、`PITFALLS.md`、`TODO.md` → `docs/`
+- 模組間維持平的 import（`import i18n`），launcher 改跑 `src\main.py`；tests 的 `sys.path` 改指 `src/`；`test_i18n` 中文掃描改掃 `src/`（仍有「不得掃到空 list」那條保護）
+- `update_checker.py` 找 `scripts/check_update.ps1` 改成往上一層；`check_update.ps1` 的 `$CodePaths` 改成 `src`/`tests`/`docs`/`scripts`/`requirements*.txt`/`launcher.ps1`。此功能之前沒推上 GitHub 過，沒有舊版用戶會用舊清單更新，所以不需要過渡處理
+- 驗證：pytest 103 passed；launcher 實跑 GUI 正常啟動、log 寫在根目錄 `logs/app.log`
+
+
 ### 變更：logs/app.log 一律英文
 - `logtext.py` 全部改英文；結果行改成 `OK, elapsed 1m 54s`，新增 `main.format_elapsed()`（附測試）。畫面上的訊息仍走 `t()`，不受影響
 - `launcher.ps1` 的 `Write-Log` / `Write-LogHeader` 全部改英文（`App start`、`Environment ready | ...` 等）

@@ -113,10 +113,10 @@ def _hardcoded_cjk(path: Path) -> list:
 
 
 def _scannable() -> list:
-    """⚠ 本專案的 .py 在**根目錄**不是 src/。寫成 ROOT/"src" 會掃到空 list，
-    parametrize 收集 0 個 case——測試「通過」但什麼都沒檢查。"""
-    skip_dirs = {"venv", ".venv", "locales", "tests", "__pycache__", ".git", "docs"}
-    return [p for p in sorted(ROOT.rglob("*.py"))
+    """⚠ 原始碼在 src/（2026-10-20 從根目錄搬進來）。路徑寫錯會掃到空 list，
+    parametrize 收集 0 個 case——測試「通過」但什麼都沒檢查，下面那條測試負責擋。"""
+    skip_dirs = {"locales", "__pycache__"}
+    return [p for p in sorted((ROOT / "src").rglob("*.py"))
             if not skip_dirs & set(p.parts)
             and p.name not in ALLOWLIST]
 

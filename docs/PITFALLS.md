@@ -39,19 +39,22 @@ console 無例外、清空無效）。
 教訓：原本的儀器把判讀責任丟給使用者記憶，實務上行不通。已改為量測對話框存活秒數
 （`elapsed`）——人類不可能在 0.5 秒內開視窗＋按取消，所以：
 
-- `耗時 0.0xx s（視窗未開啟）` → 對話框沒開起來，**確認是本 bug**
-- `耗時 N.xxx s（使用者取消）` → 正常操作，不必追
+- `elapsed 0.0xxs (dialog never opened)` → 對話框沒開起來，**確認是本 bug**
+- `elapsed N.xxxs (user cancelled)` → 正常操作，不必追
 
-**下次怎麼查：** 診斷儀器已經裝在 `main.py` 了，請使用者重現後直接看 `logs/app.log`：
+> 2026-10-20 起 log 一律英文。上面 08-09 那筆是舊格式（`合併選檔回傳空` / `耗時` / `清單現有`），
+> 新舊字樣對照見 `src/logtext.py`。
 
-- 出現 `[WARN ] 合併選檔回傳空 | ... | 耗時 ... | COM ... | 清單現有 N 筆`
-  → **先看「耗時」欄**：`（視窗未開啟）` 才是本 bug，`（使用者取消）` 直接忽略。
-  確認是 bug 後再看 `COM` 欄位是不是 `未進入 apartment(hr=0x800401F0)` 或 `MTA`
+**下次怎麼查：** 診斷儀器已經裝在 `src/main.py` 了，請使用者重現後直接看 `logs/app.log`：
+
+- 出現 `[WARN ] merge pick returned empty | ... | elapsed ... | COM ... | list has N`
+  → **先看 `elapsed` 欄**：`(dialog never opened)` 才是本 bug，`(user cancelled)` 直接忽略。
+  確認是 bug 後再看 `COM` 欄位是不是 `not in apartment(hr=0x800401F0)` 或 `MTA`
   （正常為 `STA` / `MAINSTA`），以及 `repr` 是 `()` 還是 `''`
-- 出現 `[ERROR] 合併選檔 askopenfilenames -> XxxError` → 對話框直接拋例外，是另一條路徑
+- 出現 `[ERROR] merge pick askopenfilenames -> XxxError` → 對話框直接拋例外，是另一條路徑
 - 出現 `[ERROR] UI callback -> XxxError` → tkinter 吞掉的例外，看 console 完整 traceback
 
-（使用者按「取消」也會寫 `回傳空` 那行，但耗時欄會標 `（使用者取消）`，不必再問使用者。）
+（使用者按「取消」也會寫 `returned empty` 那行，但 elapsed 欄會標 `(user cancelled)`，不必再問使用者。）
 
 ---
 

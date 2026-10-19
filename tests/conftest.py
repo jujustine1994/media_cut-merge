@@ -7,7 +7,8 @@ import tkinter as tk
 
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 原始碼在 src/，模組之間是平的 import（`import i18n`），所以把 src/ 放上 sys.path
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
 
 @pytest.fixture(scope="session")

@@ -61,7 +61,7 @@ A Windows CLI tool to split and merge audio/video files using ffmpeg.
 執行紀錄在 `logs/app.log`（單一檔案累積）。程式行為異常時，**先不要重開**，
 把這個檔案提供給 AI 判讀——重開會讓當下的狀態消失。
 
-已知問題與追查中的 bug 見 `PITFALLS.md`。
+已知問題與追查中的 bug 見 `docs/PITFALLS.md`。
 
 ## 輸出命名規則
 

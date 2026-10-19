@@ -172,7 +172,7 @@ Write-Host ""
 Write-Host "[START] 啟動中，請保持此視窗開啟..." -ForegroundColor Green
 Write-Host ""
 
-& "$VenvPython" main.py
+& "$VenvPython" src\main.py
 $exitCode = $LASTEXITCODE
 
 if ($exitCode -ne 0) {

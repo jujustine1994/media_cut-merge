@@ -22,27 +22,32 @@ tkinter GUI 工具，三個功能 Tab（分割 / 合併 / 轉檔）。
 
 ```
 media_cut-merge.bat  → 薄 BAT 入口：單行呼叫 launcher.ps1
-launcher.ps1         → 啟動邏輯：環境檢查（uv、venv、ffmpeg）→ 用 venv 的 python 執行 main.py
+launcher.ps1         → 啟動邏輯：環境檢查（uv、venv、ffmpeg）→ 用 venv 的 python 執行 src\main.py
 requirements.txt     → 目前只有註解（無第三方套件）；有非註解行 launcher 才跑 uv pip install
 requirements_test.txt → pytest（launcher 不裝，開發時手動補，見下方「Python 環境」）
-main.py              → 主程式：GUI App + 純函式（helpers）+ log/診斷函式
-i18n.py              → 介面文字查表核心（LANGUAGES 註冊表 + t()）
-config.py            → 讀寫 config.json（目前只有 language 一個欄位）
-config.json          → 使用者設定（.gitignore）
-logtext.py           → logs/app.log 的訊息字串，一律英文不跟介面語言走
-locales/
-  __init__.py
-  zh_tw.py           → 繁體中文（母表，其他語言的翻譯來源）
-  zh_cn.py / en.py / ja.py
-logs/app.log         → 執行紀錄，單一檔案累積（.gitignore）
 README.md            → 專案識別
-ARCHITECTURE.md      → 本檔
-CHANGELOG.md         → 歷史記錄
-PITFALLS.md          → 已知問題（開頭「追查中」章節是未解 bug）
-TODO.md              → 待辦
+src/
+  main.py            → 主程式：GUI App + 純函式（helpers）+ log/診斷函式
+  i18n.py            → 介面文字查表核心（LANGUAGES 註冊表 + t()）
+  config.py          → 讀寫 src/config.json（目前只有 language 一個欄位）
+  config.json        → 使用者設定（.gitignore）
+  logtext.py         → logs/app.log 的訊息字串，一律英文不跟介面語言走
+  update_checker.py  → 呼叫 scripts/check_update.ps1，解析 JSON 結果
+  locales/
+    __init__.py
+    zh_tw.py         → 繁體中文（母表，其他語言的翻譯來源）
+    zh_cn.py / en.py / ja.py
+scripts/
+  check_update.ps1   → GitHub 手動更新的資料層（見 scripts/README.md）
+docs/
+  ARCHITECTURE.md    → 本檔
+  CHANGELOG.md       → 歷史記錄
+  PITFALLS.md        → 已知問題（開頭「追查中」章節是未解 bug）
+  TODO.md            → 待辦
+logs/app.log         → 執行紀錄，單一檔案累積（.gitignore）；永遠在專案根目錄，src/ 內由 _find_project_root() 往上找 launcher.ps1 定位
 tests/
   __init__.py
-  conftest.py        → session 級共用 tk_root
+  conftest.py        → session 級共用 tk_root；把 src/ 加進 sys.path（模組間是平的 import）
   test_helpers.py    → 純函式單元測試（validate_time、build_*_cmd 等）
   test_smoke.py      → App 可匯入 smoke test
   test_i18n.py       → key 一致 / placeholder 一致 / 不得寫死中日文
@@ -57,7 +62,7 @@ tests/
 使用者雙擊 media_cut-merge.bat
   → 呼叫 launcher.ps1
       → 檢查 uv / venv / ffmpeg
-      → 執行 main.py
+      → 執行 src/main.py
       → show_cth_banner()（終端 ASCII art）
       → tk.Tk()
       → _pick_language_on_first_run()（config.json 沒有合法 language 才跳）

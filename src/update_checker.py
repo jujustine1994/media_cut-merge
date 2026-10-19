@@ -10,7 +10,8 @@ import json
 import subprocess
 from pathlib import Path
 
-_SCRIPT_PATH = Path(__file__).parent / "scripts" / "check_update.ps1"
+# 本檔在 src/，scripts/ 在專案根目錄
+_SCRIPT_PATH = Path(__file__).resolve().parent.parent / "scripts" / "check_update.ps1"
 
 
 def _run(dry_run: bool) -> dict:
