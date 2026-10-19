@@ -2,6 +2,13 @@
 
 > 現狀總覽見 ARCHITECTURE.md，本檔案只記錄歷史。
 
+## 2026-10-19
+
+### 變更：改用 uv + 獨立 venv，不再依賴系統 Python
+- `launcher.ps1`：移除「檢查系統 Python → winget 安裝」，改成 `[1/3] 檢查 uv`（沒有就從 astral.sh 裝）→ `[2/3] 檢查 venv`（`uv venv "%USERPROFILE%\venvs\Video-Combiner" --python 3.13`）→ `[3/3] 檢查 ffmpeg`（不變）；主程式改用 venv 的 python 執行。推翻 2026-08-17「需要系統 Python 例外」的判斷：純雙擊工具不需要系統 Python，跟其他專案一致
+- 新增 `requirements.txt`（只有註解，無第三方套件；launcher 偵測到非註解行才跑 `uv pip install`，避免空檔每次印 warning）與 `requirements_test.txt`（pytest）
+- 驗證：新 venv（CPython 3.13.12）`pytest tests` 98 passed；tkinter 8.6 可建視窗；launcher.ps1 語法解析 0 錯誤
+
 ## 2026-08-23
 
 ### 新增（GitHub 自動更新，手動按鈕版）

@@ -1,0 +1,2 @@
+# 無第三方套件：只用 tkinter + 標準函式庫（ffmpeg 由 launcher.ps1 另外用 winget 裝）
+# 日後要加套件寫在這裡，launcher.ps1 偵測到非註解行才會跑 uv pip install

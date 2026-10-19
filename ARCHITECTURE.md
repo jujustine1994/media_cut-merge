@@ -22,7 +22,9 @@ tkinter GUI 工具，三個功能 Tab（分割 / 合併 / 轉檔）。
 
 ```
 media_cut-merge.bat  → 薄 BAT 入口：單行呼叫 launcher.ps1
-launcher.ps1         → 啟動邏輯：環境檢查（Python、ffmpeg）→ 執行 main.py
+launcher.ps1         → 啟動邏輯：環境檢查（uv、venv、ffmpeg）→ 用 venv 的 python 執行 main.py
+requirements.txt     → 目前只有註解（無第三方套件）；有非註解行 launcher 才跑 uv pip install
+requirements_test.txt → pytest（launcher 不裝，開發時手動補，見下方「Python 環境」）
 main.py              → 主程式：GUI App + 純函式（helpers）+ log/診斷函式
 i18n.py              → 介面文字查表核心（LANGUAGES 註冊表 + t()）
 config.py            → 讀寫 config.json（目前只有 language 一個欄位）
@@ -54,7 +56,7 @@ tests/
 ```
 使用者雙擊 media_cut-merge.bat
   → 呼叫 launcher.ps1
-      → 檢查 Python / ffmpeg
+      → 檢查 uv / venv / ffmpeg
       → 執行 main.py
       → show_cth_banner()（終端 ASCII art）
       → tk.Tk()
@@ -66,6 +68,17 @@ tests/
           ├─ [合併 Tab] 選多檔排序 → ffmpeg concat -c copy
           └─ [轉檔 Tab] 多選影片 + 選格式 → ffmpeg -vn -acodec ...（批量，失敗不中止）
       → 底部共用進度區（queue 安全更新）
+```
+
+## Python 環境
+
+- venv 在 `%USERPROFILE%\venvs\Video-Combiner\`（專案外，避開 Google Drive 同步），由 `uv venv --python 3.13` 建立，電腦沒 Python 時 uv 會自己下載
+- 不依賴系統 Python、不用 winget 裝 Python；ffmpeg 仍走 winget
+- 跑測試前補裝 pytest：
+
+```powershell
+uv pip install -r requirements_test.txt --python "$env:USERPROFILE\venvs\Video-Combiner\Scripts\python.exe"
+& "$env:USERPROFILE\venvs\Video-Combiner\Scripts\python.exe" -m pytest tests -q
 ```
 
 ## 架構設計
