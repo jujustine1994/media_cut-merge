@@ -56,6 +56,21 @@ def _write_log(msg: str, level: str = "INFO"):
         pass   # log 掛掉不能拖垮主程式；也涵蓋兩個實例同時跑撞在一起
 
 
+def format_elapsed(seconds: float) -> str:
+    """耗時 → `48s` / `1m 54s` / `2h 02m 05s`（落檔用；畫面上的耗時仍走 t()）。
+    時間被調過導致負值時回 `0s`。"""
+    total = int(seconds)
+    if total <= 0:
+        return "0s"
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    if hours:
+        return f"{hours}h {minutes:02d}m {secs:02d}s"
+    if minutes:
+        return f"{minutes}m {secs:02d}s"
+    return f"{secs}s"
+
+
 def _write_log_header(msg: str):
     """任務起始行，唯一有完整日期的行"""
     try:
@@ -464,7 +479,7 @@ class ToolApp:
                         minutes=mins, seconds=secs),
                       "OK" if ok else "FAIL", to_file=True,
                       log_msg=LOG_TEXT["task_ok" if ok else "task_fail"].format(
-                          minutes=mins, seconds=secs))
+                          elapsed=format_elapsed(elapsed)))
             self._done(base_dir, ok)
         except Exception as e:
             self._log(f"\n[ERROR] {e}")
@@ -684,7 +699,7 @@ class ToolApp:
                     minutes=mins, seconds=secs),
                   "OK" if ok else "FAIL", to_file=True,
                   log_msg=LOG_TEXT["task_ok" if ok else "task_fail"].format(
-                      minutes=mins, seconds=secs))
+                          elapsed=format_elapsed(elapsed)))
         self._done(base_dir if ok else "", ok)
 
     def _build_convert_tab(self, parent):
@@ -788,7 +803,7 @@ class ToolApp:
                         minutes=mins, seconds=secs),
                       "OK" if ok else "FAIL", to_file=True,
                       log_msg=LOG_TEXT["task_ok" if ok else "task_fail"].format(
-                          minutes=mins, seconds=secs))
+                          elapsed=format_elapsed(elapsed)))
             self._done(first_success_dir, ok)
         except Exception as e:
             self._log(t("gui.log.unexpected", exc=e))
@@ -997,8 +1012,8 @@ class ToolApp:
         """推 UI queue；to_file=True 時同時落檔（預設 False，漏帶旗標時是少記不是誤記）
 
         `msg` 是給使用者看的（跟著介面語言走），`log_msg` 是落檔的那份
-        （永遠繁中，取自 logtext.LOG_TEXT）。兩者分開才能同時滿足
-        「log 固定母語言」與「一個呼叫同時寫檔＋推 UI」兩條規則；
+        （一律英文，取自 logtext.LOG_TEXT）。兩者分開才能同時滿足
+        「log 一律英文」與「一個呼叫同時寫檔＋推 UI」兩條規則；
         沒給 log_msg 時退回用 msg，行為與原本一致。
         """
         if to_file:

@@ -2,6 +2,14 @@
 
 > 現狀總覽見 ARCHITECTURE.md，本檔案只記錄歷史。
 
+## 2026-10-20
+
+### 變更：logs/app.log 一律英文
+- `logtext.py` 全部改英文；結果行改成 `OK, elapsed 1m 54s`，新增 `main.format_elapsed()`（附測試）。畫面上的訊息仍走 `t()`，不受影響
+- `launcher.ps1` 的 `Write-Log` / `Write-LogHeader` 全部改英文（`App start`、`Environment ready | ...` 等）
+- `tests/test_i18n.py`：`logtext.py` 移出豁免清單，混進中文會直接紅
+- 既有 `logs/app.log` 的舊中文行保留不動，從這版起新寫入的都是英文
+
 ## 2026-10-19
 
 ### 變更：改用 uv + 獨立 venv，不再依賴系統 Python

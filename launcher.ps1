@@ -29,11 +29,11 @@ function Write-LogHeader {
     try { [System.IO.File]::AppendAllText($LogFile, $line, $Utf8NoBom) } catch {}
 }
 
-Write-LogHeader "啟動"
+Write-LogHeader "App start"
 
 # 攔截所有未預期例外，防止視窗直接閃退
 trap {
-    Write-Log "[CRASH] $($_.Exception.Message) @ 第 $($_.InvocationInfo.ScriptLineNumber) 行" "FATAL"
+    Write-Log "[CRASH] $($_.Exception.Message) @ line $($_.InvocationInfo.ScriptLineNumber)" "FATAL"
     Write-Host ""
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
     Write-Host "[CRASH] 意外錯誤，程式無法繼續執行" -ForegroundColor Red
@@ -58,18 +58,18 @@ Write-Host ""
 # ======================================
 Write-Host "[1/3] 檢查 uv 套件管理工具..." -ForegroundColor Cyan
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-    Write-Log "找不到 uv，開始安裝" "WARN"
+    Write-Log "uv not found, installing" "WARN"
     Write-Host "[INFO] 找不到 uv，開始下載安裝程式（astral.sh）..." -ForegroundColor Yellow
     # 較舊的 Win10 上 PowerShell 5.1 可能仍預設 TLS 1.0/1.1，astral.sh 只收 1.2 以上
     try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
     try {
         Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
     } catch {
-        Write-Log "uv 下載失敗 -> $($_.Exception.GetType().Name)" "ERROR"
+        Write-Log "uv download failed -> $($_.Exception.GetType().Name)" "ERROR"
     }
     $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + $env:PATH
     if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-        Write-Log "uv 安裝失敗" "ERROR"
+        Write-Log "uv install failed" "ERROR"
         Write-Host "[ERROR] uv 安裝失敗，多半是連不上網路。請確認網路連線後關閉視窗，" -ForegroundColor Red
         Write-Host "        重新點兩下啟動檔再試一次。" -ForegroundColor Red
         Read-Host "按 Enter 關閉"; exit 1
@@ -113,7 +113,7 @@ if (-not (Test-Path $VenvPython)) {
         New-Item -ItemType Directory -Force (Split-Path $VenvPath) | Out-Null
         uv venv "$VenvPath" --python 3.13
         if ($LASTEXITCODE -ne 0) {
-            Write-Log "建立 venv 失敗（uv venv exit $LASTEXITCODE）" "ERROR"
+            Write-Log "venv creation failed (uv venv exit $LASTEXITCODE)" "ERROR"
             Write-Host "[ERROR] 建立虛擬環境失敗，多半是下載 Python 時連不上網路。" -ForegroundColor Red
             Write-Host "        請確認網路連線後關閉視窗，重新點兩下啟動檔再試一次。" -ForegroundColor Red
             Read-Host "按 Enter 關閉"; exit 1
@@ -121,7 +121,7 @@ if (-not (Test-Path $VenvPython)) {
         if ($hasDeps) {
             uv pip install -r requirements.txt --python "$VenvPython"
             if ($LASTEXITCODE -ne 0) {
-                Write-Log "套件安裝失敗（uv pip install exit $LASTEXITCODE）" "ERROR"
+                Write-Log "package install failed (uv pip install exit $LASTEXITCODE)" "ERROR"
                 Write-Host "[ERROR] 套件安裝失敗，請確認網路連線後重新執行。" -ForegroundColor Red
                 Read-Host "按 Enter 關閉"; exit 1
             }
@@ -149,7 +149,7 @@ if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
             Write-Host "[INFO] 透過 winget 安裝 ffmpeg，請稍候..." -ForegroundColor Gray
             winget install --id Gyan.FFmpeg -e --silent --accept-source-agreements --accept-package-agreements
         } else {
-            Write-Log "找不到 winget，無法自動安裝 ffmpeg" "ERROR"
+            Write-Log "winget not found, cannot install ffmpeg" "ERROR"
             Write-Host "[ERROR] 找不到 winget，請手動至 https://ffmpeg.org/download.html 下載安裝後重新執行。" -ForegroundColor Red
             Read-Host "按 Enter 關閉"; exit 1
         }
@@ -166,7 +166,7 @@ if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
     Write-Host "[OK] ffmpeg 已安裝。" -ForegroundColor Green
 }
 
-Write-Log "環境就緒 | $pyVer | $uvVer"
+Write-Log "Environment ready | $pyVer | $uvVer"
 
 Write-Host ""
 Write-Host "[START] 啟動中，請保持此視窗開啟..." -ForegroundColor Green
@@ -176,7 +176,7 @@ Write-Host ""
 $exitCode = $LASTEXITCODE
 
 if ($exitCode -ne 0) {
-    Write-Log "主程式異常結束（exit code $exitCode）" "ERROR"
+    Write-Log "app exited abnormally (exit code $exitCode)" "ERROR"
     Write-Host ""
     Write-Host "[ERROR] 程式意外停止，請回報上方錯誤訊息。" -ForegroundColor Red
     Read-Host "按 Enter 關閉"

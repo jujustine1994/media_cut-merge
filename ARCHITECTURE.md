@@ -29,7 +29,7 @@ main.py              → 主程式：GUI App + 純函式（helpers）+ log/診�
 i18n.py              → 介面文字查表核心（LANGUAGES 註冊表 + t()）
 config.py            → 讀寫 config.json（目前只有 language 一個欄位）
 config.json          → 使用者設定（.gitignore）
-logtext.py           → logs/app.log 的訊息字串，固定繁中不跟介面語言走
+logtext.py           → logs/app.log 的訊息字串，一律英文不跟介面語言走
 locales/
   __init__.py
   zh_tw.py           → 繁體中文（母表，其他語言的翻譯來源）
@@ -123,7 +123,7 @@ uv pip install -r requirements_test.txt --python "$env:USERPROFILE\venvs\Video-C
 | subprocess encoding | `errors='replace'` | 防止 Windows 中文路徑 stderr UnicodeDecodeError |
 | log 路徑 | `_find_project_root()` 往上找 `launcher.ps1` | 不可寫死 `SCRIPT_DIR/../logs`，主程式在根目錄時會寫到專案外污染別的專案 |
 | `_log(to_file=)` | 預設 `False` | fail-closed：漏帶旗標時是少記，不是把敏感資料誤記上磁碟 |
-| `_log(log_msg=)` | 選填，落檔用的另一份文字 | UI 那份走 `t()` 跟語言變、落檔那份走 `LOG_TEXT` 固定繁中，但仍維持**一個呼叫同時處理兩邊**（不維護兩套呼叫，否則一定有地方漏記）。不給就退回用 `msg` |
+| `_log(log_msg=)` | 選填，落檔用的另一份文字 | UI 那份走 `t()` 跟語言變、落檔那份走 `LOG_TEXT` 一律英文，但仍維持**一個呼叫同時處理兩邊**（不維護兩套呼叫，否則一定有地方漏記）。不給就退回用 `msg` |
 | 錯誤行內容 | 只記 `type(e).__name__` + returncode | 禁止 `f"{e}"`，例外訊息會挾帶完整路徑與 stderr 片段 |
 
 ## 多語言（i18n）
@@ -136,7 +136,7 @@ uv pip install -r requirements_test.txt --python "$env:USERPROFILE\venvs\Video-C
 | 語言註冊 | `i18n.LANGUAGES` | 新增語言＝加一行 + 複製一個 locale 檔，選單與測試自動涵蓋 |
 | 譯文 | `locales/*.py` | 只匯出 `STRINGS`，四語 key 集合必須完全一致（有測試把關） |
 | 設定 | `config.py` | `language` 預設**空字串**，用來分辨「沒選過」與「選了繁中」 |
-| log 文字 | `logtext.py` | **固定繁中**，不跟介面語言走 |
+| log 文字 | `logtext.py` | **一律英文**，不跟介面語言走；耗時用 `format_elapsed()`（`1m 54s`）。launcher.ps1 的 log 行同樣英文 |
 
 **硬性規則（改動前必讀）：**
 

@@ -2,7 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import pytest
-from main import validate_time, time_to_seconds, build_split_cmd, build_merge_list, build_convert_cmd
+from main import validate_time, time_to_seconds, build_split_cmd, build_merge_list, build_convert_cmd, format_elapsed
 
 
 class TestValidateTime:
@@ -87,3 +87,18 @@ class TestBuildConvertCmd:
         cmd = build_convert_cmd("in.mp4", "out.flac", "FLAC")
         assert cmd == ['ffmpeg', '-y', '-i', 'in.mp4',
                        '-vn', '-acodec', 'flac', 'out.flac']
+
+
+class TestFormatElapsed:
+    def test_seconds_only(self):
+        assert format_elapsed(48) == "48s"
+
+    def test_minutes(self):
+        assert format_elapsed(114) == "1m 54s"
+
+    def test_hours(self):
+        assert format_elapsed(7325) == "2h 02m 05s"
+
+    def test_zero_and_negative(self):
+        assert format_elapsed(0) == "0s"
+        assert format_elapsed(-3) == "0s"
