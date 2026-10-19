@@ -16,6 +16,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, scrolledtext
 
 import i18n
+import update_checker
 from config import CONFIG_PATH, load_config, save_config
 from i18n import t
 from logtext import LOG_TEXT
@@ -228,13 +229,16 @@ class ToolApp:
         tab_split = ttk.Frame(self.notebook, padding=8)
         tab_merge = ttk.Frame(self.notebook, padding=8)
         tab_convert = ttk.Frame(self.notebook, padding=8)
+        tab_settings = ttk.Frame(self.notebook, padding=8)
         self.notebook.add(tab_split, text=t("gui.tab.split"))
         self.notebook.add(tab_merge, text=t("gui.tab.merge"))
         self.notebook.add(tab_convert, text=t("gui.tab.convert"))
+        self.notebook.add(tab_settings, text=t("gui.tab.settings"))
 
         self._build_split_tab(tab_split)
         self._build_merge_tab(tab_merge)
         self._build_convert_tab(tab_convert)
+        self._build_settings_tab(tab_settings)
         self._build_progress_area(pad)
 
         self.root.columnconfigure(0, weight=1)
@@ -790,6 +794,112 @@ class ToolApp:
             self._log(t("gui.log.unexpected", exc=e))
             self._log(f"{type(e).__name__}", "ERROR", to_file=True)
             self._done("", False)
+
+    # ---------- 設定 Tab（目前只有版本更新，未來一般設定項都加在這個分頁）----------
+    #
+    # ⚠ 全程沒有任何一步自動觸發：「檢查更新」只讀不寫；有新版本才會出現
+    # 「一鍵安裝」，按下去還要先跳確認框，使用者按確定才真的動檔案。
+    # 更新完不自動重啟，只跳訊息框請使用者自己關掉重開，因為更新可能動到
+    # 正在執行中的模組，自動重啟的邊界情況不值得為手動觸發的功能多繞。
+    def _build_settings_tab(self, parent):
+        section = ttk.LabelFrame(parent, text=t("gui.frame.update"), padding=8)
+        section.pack(fill="x", anchor="n")
+
+        row = ttk.Frame(section)
+        row.pack(anchor="w", fill="x")
+
+        self._check_update_btn = ttk.Button(
+            row, text=t("gui.btn.check_update"), command=self._on_check_update,
+        )
+        self._check_update_btn.pack(side="left")
+
+        self._install_update_btn = ttk.Button(
+            row, text=t("gui.btn.install_update"), command=self._on_install_update,
+        )
+        # 有新版本才 pack，預設不顯示
+
+        self._update_status_var = tk.StringVar(value="")
+        ttk.Label(
+            section, textvariable=self._update_status_var,
+            foreground="gray", justify="left", anchor="w", wraplength=360,
+        ).pack(anchor="w", fill="x", pady=(8, 0))
+
+        self._pending_update_summary = ""
+
+    def _on_check_update(self):
+        self._check_update_btn.config(state="disabled")
+        self._install_update_btn.pack_forget()
+        self._update_status_var.set(t("gui.update.checking"))
+        threading.Thread(target=self._check_update_worker, daemon=True).start()
+
+    def _check_update_worker(self):
+        """背景執行緒：跑 git fetch，不可卡住主視窗。"""
+        result = update_checker.check_for_update()
+        try:
+            self.root.after(0, self._on_check_update_done, result)
+        except (RuntimeError, tk.TclError):
+            pass  # 視窗已關閉，結果沒人要了
+
+    def _on_check_update_done(self, result: dict):
+        self._check_update_btn.config(state="normal")
+        status = result.get("status")
+
+        if status == "no_git":
+            self._update_status_var.set(t("gui.update.no_git"))
+        elif status == "offline":
+            self._update_status_var.set(t("gui.update.offline"))
+        elif status == "dirty":
+            self._update_status_var.set(t("gui.update.dirty"))
+        elif status == "ahead":
+            self._update_status_var.set(t("gui.update.ahead"))
+        elif status == "up_to_date":
+            self._update_status_var.set(t("gui.update.up_to_date"))
+        elif status == "update_available":
+            self._pending_update_summary = result.get("summary", "")
+            self._update_status_var.set(
+                t("gui.update.available", count=result.get("commits", 0))
+            )
+            self._install_update_btn.pack(side="left", padx=(8, 0))
+        else:
+            self._update_status_var.set(
+                t("gui.update.error", msg=result.get("message", status or ""))
+            )
+
+    def _on_install_update(self):
+        if not messagebox.askyesno(
+            t("gui.dlg.update_confirm.title"),
+            t("gui.dlg.update_confirm.body", summary=self._pending_update_summary),
+        ):
+            return
+        self._check_update_btn.config(state="disabled")
+        self._install_update_btn.config(state="disabled")
+        self._update_status_var.set(t("gui.update.installing"))
+        threading.Thread(target=self._install_update_worker, daemon=True).start()
+
+    def _install_update_worker(self):
+        result = update_checker.install_update()
+        try:
+            self.root.after(0, self._on_install_update_done, result)
+        except (RuntimeError, tk.TclError):
+            pass
+
+    def _on_install_update_done(self, result: dict):
+        self._check_update_btn.config(state="normal")
+        status = result.get("status")
+
+        if status == "updated":
+            self._install_update_btn.pack_forget()
+            self._update_status_var.set(
+                t("gui.update.updated", commit=result.get("commit", ""))
+            )
+            messagebox.showinfo(
+                t("gui.dlg.update_done.title"), t("gui.dlg.update_done.body")
+            )
+        else:
+            self._install_update_btn.config(state="normal")
+            self._update_status_var.set(
+                t("gui.update.error", msg=result.get("message", status or ""))
+            )
 
     def _build_progress_area(self, pad):
         frame = ttk.LabelFrame(self.root, text=t("gui.frame.progress"), padding=8)

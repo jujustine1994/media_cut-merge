@@ -35,6 +35,10 @@ A Windows CLI tool to split and merge audio/video files using ffmpeg.
 - **音訊轉檔**：選擇影像檔案，轉為 MP3 / AAC / WAV / FLAC 音訊格式
 - **多語言介面**：繁體中文 / 简体中文 / English / 日本語
 
+## 檢查更新
+
+主視窗「設定」分頁有「檢查更新」按鈕，會連線 GitHub 比對是否有新版本；有新版本才會出現「一鍵安裝」，按下去會先跳確認框列出本次變更再動檔案。全程不會自動觸發，安裝完也不會自動重啟，請依訊息提示自行關閉程式後重新雙擊啟動器。此功能僅適用於 `git clone` 部署，若是 zip 下載版請自行至 GitHub 頁面下載最新版本。
+
 ## 語言設定
 
 第一次啟動會跳一個 Language 視窗讓你選介面語言，選完記在 `config.json`，之後不再詢問。

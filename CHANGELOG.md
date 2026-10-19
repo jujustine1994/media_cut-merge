@@ -2,6 +2,17 @@
 
 > 現狀總覽見 ARCHITECTURE.md，本檔案只記錄歷史。
 
+## 2026-08-23
+
+### 新增（GitHub 自動更新，手動按鈕版）
+- 新增第 4 個 Notebook 分頁「設定」（`gui.tab.settings`），放版本更新區塊，不動既有 3 個任務分頁與主視窗的語言下拉
+- `scripts/check_update.ps1`：純資料層，`git fetch` / `diff` / `checkout`，只在 stdout 印一行 JSON（`status` 欄位：`no_git` / `offline` / `dirty` / `ahead` / `up_to_date` / `update_available` / `updated` / `error`）；`-DryRun` 只檢查不動檔案
+- `update_checker.py`：呼叫子行程 + 解析 JSON，不碰 tkinter，可單獨測試
+- `main.py` 新增「檢查更新」「一鍵安裝」按鈕：`git fetch` 丟到背景執行緒跑，`.after(0, ...)` 送回主執行緒更新 UI；有新版本才顯示「一鍵安裝」，按下去先跳確認框列出本次變更摘要，使用者按確定才真的動檔案；安裝完不自動重啟，跳訊息框請使用者自行關閉重開
+- `locales/{zh_tw,zh_cn,en,ja}.py` 各新增 18 條版本更新相關字串（`gui.tab.settings`、`gui.frame.update`、`gui.btn.check_update`、`gui.btn.install_update`、`gui.update.*`、`gui.dlg.update_confirm.*`、`gui.dlg.update_done.*`），四語 key 集合與 placeholder 保持一致
+- `scripts/README.md`：新建腳本索引表
+- 本專案沒有 `requirements.txt`（無第三方套件，見 2026-08-17 條目），`check_update.ps1` 的 `$CodePaths` 仍沿用範本慣例列出該檔名，實際比對時由 `Where-Object { Test-Path $_ }` 自動濾掉
+
 ## 2026-08-17
 
 ### 修正：launcher.ps1 winget Python ID 補上次版號

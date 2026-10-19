@@ -9,6 +9,7 @@ STRINGS: dict[str, str] = {
     "gui.tab.split":            "  分割  ",
     "gui.tab.merge":            "  結合  ",
     "gui.tab.convert":          "  変換  ",
+    "gui.tab.settings":         "  設定  ",
 
     # ---- セクション見出し ----
     "gui.frame.source_file":    " 入力ファイル ",
@@ -100,4 +101,23 @@ STRINGS: dict[str, str] = {
     "gui.msg.close_title":      "終了の確認",
     "gui.msg.close_body":       "処理の実行中です。ウィンドウを閉じますか？"
                                 "閉じると処理は中止されます。",
+
+    # ---- 設定タブ：バージョン更新 ----
+    "gui.frame.update":         " アップデート ",
+    "gui.btn.check_update":     "更新を確認",
+    "gui.btn.install_update":   "ワンクリックインストール",
+    "gui.update.checking":      "確認中...",
+    "gui.update.no_git":        "このバージョンは自動更新できません。GitHub ページから最新版をダウンロードしてください。",
+    "gui.update.offline":       "GitHub に接続できません。ネットワーク接続を確認して再度お試しください。",
+    "gui.update.dirty":         "ローカルのコードに手動変更が検出されたためスキップしました（変更を上書きしないため）。",
+    "gui.update.ahead":         "未同期のローカル変更があるためスキップしました（変更を上書きしないため）。",
+    "gui.update.up_to_date":    "最新バージョンです。",
+    "gui.update.available":     "新しいバージョンがあります（{count} 件の変更）。「ワンクリックインストール」で更新してください。",
+    "gui.dlg.update_confirm.title": "更新の確認",
+    "gui.dlg.update_confirm.body":  "コードを更新します。反映には手動での再起動が必要です。\n\n今回の変更：\n{summary}\n\n続行しますか？",
+    "gui.update.installing":    "インストール中...",
+    "gui.update.updated":       "最新バージョン（{commit}）に更新しました。プログラムを閉じて再度開いてください。",
+    "gui.dlg.update_done.title": "更新完了",
+    "gui.dlg.update_done.body":  "最新バージョンをインストールしました。このウィンドウを閉じてから起動ファイルをダブルクリックし直してください。",
+    "gui.update.error":         "更新確認に失敗しました：{msg}",
 }

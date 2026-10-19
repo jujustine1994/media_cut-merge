@@ -19,6 +19,7 @@ STRINGS: dict[str, str] = {
     "gui.tab.split":            "  分割  ",
     "gui.tab.merge":            "  合併  ",
     "gui.tab.convert":          "  轉檔  ",
+    "gui.tab.settings":         "  設定  ",
 
     # ---- 區塊標題 ----
     "gui.frame.source_file":    " 來源檔案 ",
@@ -107,4 +108,23 @@ STRINGS: dict[str, str] = {
                                 "請關閉程式重新開啟，並把 logs\\app.log 提供給 AI 查詢。",
     "gui.msg.close_title":      "確認關閉",
     "gui.msg.close_body":       "任務執行中，確定要關閉視窗嗎？關閉後任務會被中止。",
+
+    # ---- 設定分頁：版本更新 ----
+    "gui.frame.update":         " 版本更新 ",
+    "gui.btn.check_update":     "檢查更新",
+    "gui.btn.install_update":   "一鍵安裝",
+    "gui.update.checking":      "檢查中...",
+    "gui.update.no_git":        "此版本無法自動更新，請至 GitHub 頁面下載最新版本。",
+    "gui.update.offline":       "連不上 GitHub，請確認網路連線後再試一次。",
+    "gui.update.dirty":         "偵測到本機程式碼有手動修改，已略過（避免覆蓋你的修改）。",
+    "gui.update.ahead":         "本機有尚未同步的變更，已略過（避免覆蓋你的修改）。",
+    "gui.update.up_to_date":    "已是最新版本。",
+    "gui.update.available":     "發現新版本（{count} 筆變更），點「一鍵安裝」更新。",
+    "gui.dlg.update_confirm.title": "確認安裝更新",
+    "gui.dlg.update_confirm.body":  "即將更新程式碼，需要手動重啟程式才會生效。\n\n本次變更：\n{summary}\n\n是否繼續？",
+    "gui.update.installing":    "安裝中...",
+    "gui.update.updated":       "已更新到最新版本（{commit}），請關閉程式後重新開啟。",
+    "gui.dlg.update_done.title": "更新完成",
+    "gui.dlg.update_done.body":  "已安裝最新版本，請關閉這個視窗後重新雙擊啟動器，讓新版本生效。",
+    "gui.update.error":         "檢查更新失敗：{msg}",
 }

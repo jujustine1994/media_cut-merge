@@ -9,6 +9,7 @@ STRINGS: dict[str, str] = {
     "gui.tab.split":            "  Split  ",
     "gui.tab.merge":            "  Merge  ",
     "gui.tab.convert":          "  Convert  ",
+    "gui.tab.settings":         "  Settings  ",
 
     # ---- Section headings ----
     "gui.frame.source_file":    " Source File ",
@@ -100,4 +101,26 @@ STRINGS: dict[str, str] = {
     "gui.msg.close_title":      "Confirm Close",
     "gui.msg.close_body":       "A task is still running. Close the window anyway? "
                                 "The task will be aborted.",
+
+    # ---- Settings tab: version update ----
+    "gui.frame.update":         " Updates ",
+    "gui.btn.check_update":     "Check for Updates",
+    "gui.btn.install_update":   "Install Update",
+    "gui.update.checking":      "Checking...",
+    "gui.update.no_git":        "This copy can't auto-update. Please download the latest version from GitHub.",
+    "gui.update.offline":       "Could not reach GitHub. Check your network connection and try again.",
+    "gui.update.dirty":         "Local code changes detected, skipped (to avoid overwriting your changes).",
+    "gui.update.ahead":         "Local commits not yet synced, skipped (to avoid overwriting your changes).",
+    "gui.update.up_to_date":    "You are on the latest version.",
+    "gui.update.available":     "New version available ({count} changes). Click \"Install Update\" to update.",
+    "gui.dlg.update_confirm.title": "Confirm Update",
+    "gui.dlg.update_confirm.body":  "This will update the app code. You will need to restart the app "
+                                     "manually for it to take effect.\n\nChanges in this update:\n{summary}"
+                                     "\n\nContinue?",
+    "gui.update.installing":    "Installing...",
+    "gui.update.updated":       "Updated to the latest version ({commit}). Please close and reopen the app.",
+    "gui.dlg.update_done.title": "Update Complete",
+    "gui.dlg.update_done.body":  "The latest version has been installed. Close this window and "
+                                  "double-click the launcher again to apply it.",
+    "gui.update.error":         "Update check failed: {msg}",
 }
