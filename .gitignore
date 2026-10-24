@@ -7,3 +7,4 @@ __pycache__/
 logs/
 _merge_list_tmp.txt
 config.json
+*.pem

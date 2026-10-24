@@ -1,5 +1,11 @@
-規則檔: windows-tool.md
-類型: Windows 工具
+```
+/*  ================================  *\
+ *                                    *
+ *          C  T  H                   *
+ *        created by CTH              *
+ *                                    *
+\*  ================================  */
+```
 
 # media_cut-merge
 
@@ -70,3 +76,7 @@ A Windows CLI tool to split and merge audio/video files using ffmpeg.
 | 分割 | `{原檔名}_part1.{副檔名}`、`{原檔名}_part2.{副檔名}`... |
 | 合併 | `{第一個檔名}_merge.{副檔名}` |
 | 轉檔 | `{原檔名}.{副檔名}` |
+
+## 開發維護入口
+
+AI 初始化、任務導航、修改界線及驗證要求見 [AGENTS.md](AGENTS.md)。架構與待辦維持既有位置，依任務查閱。本機設定、金鑰與執行資料的排除項目以 [.gitignore](.gitignore) 為準。
