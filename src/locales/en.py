@@ -93,6 +93,11 @@ STRINGS: dict[str, str] = {
     "gui.msg.need_two_files":   "Please select at least 2 files",
     "gui.msg.need_outname":     "Please enter an output file name",
     "gui.msg.bad_outname":      "The file name must not contain \\ / : * ? \" < > |",
+    "gui.msg.exists_title":     "File exists",
+    "gui.msg.exists_body":      "A file with this name already exists:\n{name}\n\nWhat do you want to do?",
+    "gui.btn.overwrite":        "Overwrite",
+    "gui.btn.rename":           "Rename",
+    "gui.btn.cancel":           "Cancel",
     "gui.msg.need_video":       "Please select a source video first",
     "gui.msg.pick_fail_title":  "File Picker Failed",
     "gui.msg.pick_fail_body":   "The file picker hit an error ({exc}).\n"

@@ -102,6 +102,11 @@ STRINGS: dict[str, str] = {
     "gui.msg.need_two_files":   "請至少選擇 2 個檔案",
     "gui.msg.need_outname":     "請輸入輸出檔名",
     "gui.msg.bad_outname":      "檔名不可包含 \\ / : * ? \" < > |",
+    "gui.msg.exists_title":     "檔案已存在",
+    "gui.msg.exists_body":      "資料夾內已有同名檔案：\n{name}\n\n要怎麼處理？",
+    "gui.btn.overwrite":        "覆蓋",
+    "gui.btn.rename":           "換名字",
+    "gui.btn.cancel":           "取消",
     "gui.msg.need_video":       "請先選擇來源影片",
     "gui.msg.pick_fail_title":  "選檔失敗",
     "gui.msg.pick_fail_body":   "檔案選取視窗發生錯誤（{exc}）。\n"

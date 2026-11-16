@@ -175,13 +175,15 @@ def run_ffmpeg_to(cmd_builder, out_path):
     if out_path.isascii():
         cmd = cmd_builder(out_path)
         return subprocess.run(cmd, capture_output=True, text=True,
-                               encoding='utf-8', errors='replace')
+                               encoding='utf-8', errors='replace',
+                               creationflags=subprocess.CREATE_NO_WINDOW)
     base_dir = os.path.dirname(out_path)
     ext = os.path.splitext(out_path)[1]
     tmp_path = os.path.join(base_dir, f"_tmp_{uuid.uuid4().hex}{ext}")
     cmd = cmd_builder(tmp_path)
     result = subprocess.run(cmd, capture_output=True, text=True,
-                             encoding='utf-8', errors='replace')
+                             encoding='utf-8', errors='replace',
+                             creationflags=subprocess.CREATE_NO_WINDOW)
     if result.returncode == 0 and os.path.exists(tmp_path):
         os.replace(tmp_path, out_path)
     elif os.path.exists(tmp_path):
@@ -617,6 +619,39 @@ class ToolApp:
     def _merge_outname_edited(self, event):
         self._merge_outname_auto = False
 
+    def _ask_overwrite(self, filename):
+        """同名檔案已存在時的三選一對話框，回傳 'overwrite' / 'rename' / 'cancel'。
+        關掉視窗視為取消（最安全，不會動到舊檔）。"""
+        result = {"v": "cancel"}
+        dlg = tk.Toplevel(self.root)
+        dlg.title(t("gui.msg.exists_title"))
+        dlg.resizable(False, False)
+        dlg.transient(self.root)
+
+        ttk.Label(dlg, text=t("gui.msg.exists_body", name=filename),
+                  justify="left", wraplength=360).pack(padx=20, pady=(18, 12))
+        row = ttk.Frame(dlg)
+        row.pack(padx=20, pady=(0, 16))
+
+        def _pick(v):
+            result["v"] = v
+            dlg.destroy()
+
+        for key, v in (("gui.btn.overwrite", "overwrite"),
+                       ("gui.btn.rename", "rename"),
+                       ("gui.btn.cancel", "cancel")):
+            ttk.Button(row, text=t(key), command=lambda v=v: _pick(v)).pack(
+                side="left", padx=4)
+
+        dlg.update_idletasks()
+        x = self.root.winfo_rootx() + (self.root.winfo_width() - dlg.winfo_width()) // 2
+        y = self.root.winfo_rooty() + (self.root.winfo_height() - dlg.winfo_height()) // 3
+        dlg.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+        dlg.protocol("WM_DELETE_WINDOW", lambda: _pick("cancel"))
+        dlg.grab_set()
+        self.root.wait_window(dlg)
+        return result["v"]
+
     def _merge_start(self):
         if len(self._merge_files) < 2:
             messagebox.showerror(t("gui.msg.error_title"), t("gui.msg.need_two_files"))
@@ -629,6 +664,21 @@ class ToolApp:
         if any(c in outname for c in '\\/:*?"<>|'):
             messagebox.showerror(t("gui.msg.error_title"), t("gui.msg.bad_outname"))
             return
+        # 輸出檔已存在 → 問使用者：覆蓋 / 換名字 / 取消
+        base_dir = os.path.dirname(self._merge_files[0])
+        ext = os.path.splitext(self._merge_files[0])[1]
+        target = os.path.join(base_dir, outname + ext)
+        if os.path.exists(target):
+            choice = self._ask_overwrite(os.path.basename(target))
+            if choice == "rename":
+                # 自動編號：xxx_merge (1)、(2)… 取第一個不存在的
+                n = 1
+                while os.path.exists(os.path.join(base_dir, f"{outname} ({n}){ext}")):
+                    n += 1
+                outname = f"{outname} ({n})"
+                self.merge_outname_var.set(outname)
+            elif choice != "overwrite":
+                return
         self._reset_for_run(self.btn_merge_start)
         threading.Thread(
             target=self._merge_worker, args=(list(self._merge_files), outname), daemon=True

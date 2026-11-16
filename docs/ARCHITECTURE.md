@@ -11,6 +11,7 @@ tkinter GUI 工具，三個功能 Tab（分割 / 合併 / 轉檔）。
 - 影像 → 音訊轉檔（MP3 / AAC / WAV / FLAC，可多選批量，失敗不中止）
 - 非 ASCII 路徑處理：先輸出英文暫存檔再用 Python 改名
 - 合併來源檔名含特殊字元處理：先建英文暫存 hardlink（失敗則複製）
+- 合併輸出檔已存在時跳三選一對話框（覆蓋 / 換名字＝自動編號 `xxx_merge (1)` / 取消），關視窗視為取消
 - 執行紀錄落檔 `logs/app.log`（launcher.ps1 與 main.py 共用單一檔案）
 - 關閉視窗防呆（任務執行中跳確認）
 - 錯誤處理與診斷儀器（見下方「錯誤處理與診斷」）
@@ -21,8 +22,9 @@ tkinter GUI 工具，三個功能 Tab（分割 / 合併 / 轉檔）。
 ## 檔案清單
 
 ```
-media_cut-merge.bat  → 薄 BAT 入口：單行呼叫 launcher.ps1
-launcher.ps1         → 啟動邏輯：環境檢查（uv、venv、ffmpeg）→ 用 venv 的 python 執行 src\main.py
+Video-Combiner啟動器.vbs → 唯一入口（無黑窗）：隱藏執行 launcher.ps1 -Silent；內容純 ASCII（WSH 不認 UTF-8）
+launcher.ps1         → 啟動邏輯：環境檢查（uv、venv、ffmpeg）→ 修正 venv 的假 pythonw → 執行 src\main.py
+                       -Silent（VBS 帶）用 pythonw、stderr → logs/last_error.txt；不帶則黑窗模式（首次安裝、除錯）
 requirements.txt     → 目前只有註解（無第三方套件）；有非註解行 launcher 才跑 uv pip install
 requirements_test.txt → pytest（launcher 不裝，開發時手動補，見下方「Python 環境」）
 README.md            → 專案識別
@@ -59,11 +61,12 @@ tests/
 ## 執行流程
 
 ```
-使用者雙擊 media_cut-merge.bat
-  → 呼叫 launcher.ps1
-      → 檢查 uv / venv / ffmpeg
-      → 執行 src/main.py
-      → show_cth_banner()（終端 ASCII art）
+使用者雙擊 Video-Combiner啟動器.vbs
+  → 隱藏執行 launcher.ps1 -Silent
+      → 缺 uv / venv / ffmpeg → Start-Process 一般視窗重跑 launcher.ps1（互動安裝），本次結束
+      → 修正 venv 的 pythonw.exe（uv 建的是主控台版複本，地雷十三）
+      → pythonw 執行 src/main.py；非 0 結束跳彈窗，traceback 在 logs/last_error.txt
+      → show_cth_banner()（無主控台下 print 不輸出；直接跑 launcher.ps1 才看得到）
       → tk.Tk()
       → _pick_language_on_first_run()（config.json 沒有合法 language 才跳）
       → ToolApp：load_config → i18n.set_lang → 建 widget
@@ -126,6 +129,8 @@ uv pip install -r requirements_test.txt --python "$env:USERPROFILE\venvs\Video-C
 | 轉檔進度條 | determinate（批量） | 以檔案數計算進度（N/total） |
 | `_active_start_btn` | 追蹤當前執行中的按鈕 | 統一 _done 處理，不需 per-tab 判斷 |
 | subprocess encoding | `errors='replace'` | 防止 Windows 中文路徑 stderr UnicodeDecodeError |
+| ffmpeg 呼叫旗標 | `creationflags=subprocess.CREATE_NO_WINDOW` | pythonw 無主控台，不加的話每次跑 ffmpeg 都會各自閃黑窗（地雷十五）。新增 ffmpeg／其他主控台程式呼叫時一律要加 |
+| 入口 | VBS（GUI 工具），不用 BAT | 2026-10-27 改；新增 `.py` 時不可直接 `sys.stdout.reconfigure()`／`.write()`（pythonw 下為 None，地雷十四） |
 | log 路徑 | `_find_project_root()` 往上找 `launcher.ps1` | 不可寫死 `SCRIPT_DIR/../logs`，主程式在根目錄時會寫到專案外污染別的專案 |
 | `_log(to_file=)` | 預設 `False` | fail-closed：漏帶旗標時是少記，不是把敏感資料誤記上磁碟 |
 | `_log(log_msg=)` | 選填，落檔用的另一份文字 | UI 那份走 `t()` 跟語言變、落檔那份走 `LOG_TEXT` 一律英文，但仍維持**一個呼叫同時處理兩邊**（不維護兩套呼叫，否則一定有地方漏記）。不給就退回用 `msg` |

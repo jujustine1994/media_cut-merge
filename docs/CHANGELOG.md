@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## 2026-11-17 — 合併輸出同名檔案確認
+
+- 之前輸出檔已存在會直接被 `-y` / `os.replace` 靜默覆蓋。現在 `_merge_start` 先檢查，已存在則跳 `_ask_overwrite` 對話框：覆蓋／換名字／取消。
+- 「換名字」自動編號：取第一個不存在的 `{outname} ({n}){ext}`（n 從 1 起），並回填輸出檔名欄位後直接開始合併；關掉對話框視為取消。
+- 四語 locale 補 `gui.msg.exists_title`／`exists_body`、`gui.btn.overwrite`／`rename`／`cancel`。
+- 驗證：pytest 103 passed。**未實測**：實際開 GUI 點對話框三個按鈕。
+- **未處理**：輸出檔名與來源檔同名且選覆蓋時，ASCII 路徑下 ffmpeg 可能讀寫同一檔（僅程式推論，未實測）。
+
+## 2026-10-27 — 入口改為 VBS 無黑窗
+
+- 新增 `Video-Combiner啟動器.vbs`（隱藏執行 `launcher.ps1 -Silent`），刪除 `media_cut-merge.bat`。
+- `launcher.ps1`：加 `-Silent` 參數；缺 uv／venv／ffmpeg 時改開一般視窗重跑（避免隱藏視窗裡 `Read-Host` 卡死）；修正 venv 假 `pythonw.exe`；Silent 下用 pythonw 啟動、stderr 導到 `logs/last_error.txt`，崩潰與非 0 結束改彈窗。不帶 `-Silent` 的黑窗流程不變。
+- `src/main.py`：兩處 `subprocess.run`（ffmpeg）加 `CREATE_NO_WINDOW`；其餘 stdout／stderr 用法已檢查，無 `.reconfigure()` 類寫法，`print` banner 保留。
+- `scripts/check_update.ps1`：`$CodePaths` 除 `*.bat` 外加 `*.vbs`，更新時才會同步新入口。
+- README、ARCHITECTURE 的入口描述同步。
+- 驗證：pytest 103 passed；用 `wscript` 雙擊 VBS，啟動前後以 `EnumWindows` 比對，新出現的可見視窗只有 `TkTopLevel`（程式本身），無主控台；關視窗後 pythonw 與隱藏 launcher 皆正常結束、`last_error.txt` 自動清除。**未實測**：首次安裝（無 venv）與缺 ffmpeg 時的重開一般視窗分支、實際跑分割／合併／轉檔時是否還閃黑窗。
+
 ## 2026-10-25 — README／AGENTS 分工遷移
 
 - 新增根目錄 AGENTS：承接一次性初始化、按任務閱讀、修改界線與驗證入口；引用既有規則正本，README 保留給人的介紹、安裝與操作，不再以 windows-tool 欄位啟動舊預讀。
