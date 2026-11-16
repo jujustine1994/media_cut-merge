@@ -52,7 +52,7 @@ try {
         "src", "tests", "docs", "scripts",
         "requirements.txt", "requirements_test.txt", "launcher.ps1"
     )
-    Get-ChildItem -Path . -Filter "*.bat" -File | ForEach-Object { $CodePaths += $_.Name }
+    Get-ChildItem -Path .\* -Include "*.bat", "*.vbs" -File | ForEach-Object { $CodePaths += $_.Name }
     $CodePaths = $CodePaths | Where-Object { Test-Path $_ }
 
     git fetch origin --quiet 2>$null

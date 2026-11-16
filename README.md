@@ -20,7 +20,7 @@ A Windows CLI tool to split and merge audio/video files using ffmpeg.
 
 ## 執行方式
 
-雙擊 `media_cut-merge.bat` 啟動。
+雙擊 `Video-Combiner啟動器.vbs` 啟動（不會跳黑色視窗，只出現程式視窗）。首次執行或缺 ffmpeg 時，會自動開一般視窗引導安裝，一路按 Enter 即可。
 
 ## 系統需求
 
@@ -32,7 +32,7 @@ A Windows CLI tool to split and merge audio/video files using ffmpeg.
 1. 安裝 Python：https://www.python.org/
 2. 安裝 ffmpeg：https://ffmpeg.org/download.html
    - 下載解壓縮後，將 `bin/` 路徑加入系統環境變數 PATH
-3. 雙擊 `media_cut-merge.bat` 即可使用，無需額外套件安裝
+3. 雙擊 `Video-Combiner啟動器.vbs` 即可使用，無需額外套件安裝
 
 ## 功能
 

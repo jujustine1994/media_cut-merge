@@ -1,5 +1,10 @@
 ﻿# Audio/Video Split-Merge Tool 啟動器
 
+# 兩種跑法：
+#   雙擊 Video-Combiner啟動器.vbs → 帶 -Silent，全程不開黑窗，主程式用 pythonw 跑
+#   直接跑 powershell -File launcher.ps1 → 一般模式，黑窗顯示完整過程（首次安裝、除錯用）
+param([switch]$Silent)
+
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $host.UI.RawUI.WindowTitle = "Audio/Video Split-Merge Tool"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -8,6 +13,15 @@ Set-Location $ScriptDir
 # venv 建在專案外，避開 Google Drive 同步（見 windows-tool.md「venv 位置」）
 $VenvPath   = Join-Path $env:USERPROFILE "venvs\Video-Combiner"
 $VenvPython = Join-Path $VenvPath "Scripts\python.exe"
+
+# 無主控台模式碰到需要使用者操作的情況（首次安裝、缺 uv／ffmpeg），改開一般視窗重跑，
+# 不然 Read-Host 會在看不見的視窗裡卡住（ffmpeg 是必要元件，所以列入條件）
+if ($Silent -and (-not (Get-Command uv -ErrorAction SilentlyContinue) -or
+                  -not (Test-Path $VenvPython) -or
+                  -not (Get-Command ffmpeg -ErrorAction SilentlyContinue))) {
+    Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
+    exit 0
+}
 
 # ======================================
 # 執行紀錄（必加，須放在 trap 之前，閃退才記得到）
@@ -29,11 +43,21 @@ function Write-LogHeader {
     try { [System.IO.File]::AppendAllText($LogFile, $line, $Utf8NoBom) } catch {}
 }
 
+# 無主控台模式沒有畫面可看，錯誤改用彈窗告知
+function Show-Popup {
+    param([string]$Msg)
+    try { (New-Object -ComObject WScript.Shell).Popup($Msg, 0, "Audio/Video Split-Merge Tool", 16) | Out-Null } catch {}
+}
+
 Write-LogHeader "App start"
 
 # 攔截所有未預期例外，防止視窗直接閃退
 trap {
     Write-Log "[CRASH] $($_.Exception.Message) @ line $($_.InvocationInfo.ScriptLineNumber)" "FATAL"
+    if ($Silent) {
+        Show-Popup "啟動失敗：$($_.Exception.Message)`n`n已記錄至 logs\app.log，請交給開發者或 AI 查看。"
+        exit 1
+    }
     Write-Host ""
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
     Write-Host "[CRASH] 意外錯誤，程式無法繼續執行" -ForegroundColor Red
@@ -168,19 +192,53 @@ if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
 
 Write-Log "Environment ready | $pyVer | $uvVer"
 
-Write-Host ""
-Write-Host "[START] 啟動中，請保持此視窗開啟..." -ForegroundColor Green
-Write-Host ""
+# uv 建的 venv，pythonw.exe 其實是主控台版的複本，照樣會開黑窗（地雷十三）。
+# 比對雜湊，相同就換成 base Python 附的官方 venvwlauncher.exe；重建 venv 後會自動再修一次
+$VenvPythonW = Join-Path $VenvPath "Scripts\pythonw.exe"
+if ((Get-FileHash $VenvPythonW).Hash -eq (Get-FileHash $VenvPython).Hash) {
+    $pyHome = (Get-Content (Join-Path $VenvPath "pyvenv.cfg") | Where-Object { $_ -match '^home\s*=' } | Select-Object -First 1) -replace '^home\s*=\s*', ''
+    $wLauncher = Join-Path $pyHome "Lib\venv\scripts\nt\venvwlauncher.exe"
+    try {
+        Copy-Item $wLauncher $VenvPythonW -Force -ErrorAction Stop
+        Write-Log "Fixed venv pythonw.exe (replaced with venvwlauncher.exe)"
+    } catch {
+        Write-Log "Fix pythonw.exe failed ($($_.Exception.GetType().Name)), console may still appear" "WARN"
+    }
+}
 
-& "$VenvPython" src\main.py
-$exitCode = $LASTEXITCODE
+if ($Silent) {
+    # pythonw 沒有主控台：print() 直接消失，例外的 traceback 走 stderr，
+    # 導到 logs\last_error.txt 才看得到（每次啟動覆蓋，沒內容就刪掉）
+    $ErrFile = Join-Path $ScriptDir "logs\last_error.txt"
+    $env:PYTHONIOENCODING = "utf-8"
+    $proc = Start-Process -FilePath $VenvPythonW -ArgumentList "src\main.py" `
+        -WorkingDirectory $ScriptDir -RedirectStandardError $ErrFile -PassThru
+    $null = $proc.Handle   # 先抓 handle，不然結束後 ExitCode 讀不到
+    $proc.WaitForExit()
+    $exitCode = $proc.ExitCode
+    if ((Get-Item $ErrFile -ErrorAction SilentlyContinue).Length -gt 0) {
+        Write-Log "App wrote to stderr, see logs\last_error.txt" "WARN"
+    } else {
+        Remove-Item $ErrFile -ErrorAction SilentlyContinue
+    }
+} else {
+    Write-Host ""
+    Write-Host "[START] 啟動中，請保持此視窗開啟..." -ForegroundColor Green
+    Write-Host ""
+    & "$VenvPython" src\main.py
+    $exitCode = $LASTEXITCODE
+}
 
 if ($exitCode -ne 0) {
     Write-Log "app exited abnormally (exit code $exitCode)" "ERROR"
+    if ($Silent) {
+        Show-Popup "程式意外停止（代碼 $exitCode）。`n`n錯誤內容在 logs\last_error.txt，請交給開發者或 AI 查看。"
+        exit 1
+    }
     Write-Host ""
     Write-Host "[ERROR] 程式意外停止，請回報上方錯誤訊息。" -ForegroundColor Red
     Read-Host "按 Enter 關閉"
-} else {
+} elseif (-not $Silent) {
     Write-Host ""
     Write-Host "5 秒後自動關閉..." -ForegroundColor Gray
     Start-Sleep -Seconds 5
